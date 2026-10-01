@@ -1,0 +1,16 @@
+# Local developer settings
+.claude/
+project.private.config.json
+
+# Dependencies and generated output
+node_modules/
+*.log
+
+# Local secrets
+.env
+.env.*
+!.env.example
+
+# Operating system files
+.DS_Store
+Thumbs.db
