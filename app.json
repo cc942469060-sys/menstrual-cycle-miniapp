@@ -1,0 +1,13 @@
+{
+  "pages": [
+    "pages/index/index"
+  ],
+  "window": {
+    "navigationBarTitleText": "经期助手",
+    "navigationBarBackgroundColor": "#FF6B8A",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#FFF5F7"
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

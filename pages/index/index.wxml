@@ -1,0 +1,214 @@
+<view class="container">
+
+  <!-- ====== 首次使用设置弹窗 ====== -->
+  <view class="setup-overlay" wx:if="{{showSetup}}" catchtap="">
+    <view class="setup-modal" catchtap="">
+      <view class="setup-header">
+        <view class="setup-icon">🌸</view>
+        <view class="setup-title">欢迎使用经期助手</view>
+        <view class="setup-desc">请先设置你的周期参数，以便准确预测</view>
+      </view>
+
+      <view class="setup-body">
+        <!-- 周期天数设置 -->
+        <view class="setup-row">
+          <view class="setup-label">
+            <text class="setup-name">周期天数</text>
+            <text class="setup-hint">两次经期开始日之间的间隔</text>
+          </view>
+          <view class="setup-stepper">
+            <view class="setup-stepper-btn" bindtap="onSetupCycleChange" data-delta="{{-1}}">−</view>
+            <text class="setup-stepper-value">{{setupCycleLength}} 天</text>
+            <view class="setup-stepper-btn" bindtap="onSetupCycleChange" data-delta="{{1}}">+</view>
+          </view>
+        </view>
+
+        <!-- 经期天数设置 -->
+        <view class="setup-row">
+          <view class="setup-label">
+            <text class="setup-name">经期天数</text>
+            <text class="setup-hint">每次经期持续的天数</text>
+          </view>
+          <view class="setup-stepper">
+            <view class="setup-stepper-btn" bindtap="onSetupPeriodChange" data-delta="{{-1}}">−</view>
+            <text class="setup-stepper-value">{{setupPeriodLength}} 天</text>
+            <view class="setup-stepper-btn" bindtap="onSetupPeriodChange" data-delta="{{1}}">+</view>
+          </view>
+        </view>
+      </view>
+
+      <view class="setup-footer">
+        <view class="setup-btn setup-btn-primary" bindtap="confirmSetup">开始使用</view>
+        <view class="setup-btn setup-btn-ghost" bindtap="skipSetup">稍后设置</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- ====== 头部 ====== -->
+  <view class="header">
+    <view class="header-title">经期助手</view>
+    <view class="header-subtitle">记录 · 预测 · 关爱自己</view>
+  </view>
+
+  <!-- ====== 月份导航 ====== -->
+  <view class="month-nav">
+    <view class="nav-btn" bindtap="prevMonth">
+      <text class="nav-arrow">‹</text>
+    </view>
+    <view class="month-title" bindtap="goToToday">
+      {{year}} 年 {{month}} 月
+    </view>
+    <view class="nav-btn" bindtap="nextMonth">
+      <text class="nav-arrow">›</text>
+    </view>
+  </view>
+
+  <!-- ====== 今天按钮 ====== -->
+  <view class="today-bar">
+    <view class="today-btn-centered" bindtap="goToToday">
+      <text class="today-btn-text">今天 {{todayDateStr}}</text>
+    </view>
+  </view>
+
+  <!-- 待定提示 -->
+  <view class="pending-tip" wx:if="{{pendingStart}}">
+    经期开始日期：<text class="pending-date">{{pendingStart}}</text>（点击日历可手动选择结束日期）
+  </view>
+
+  <!-- ====== 星期行 ====== -->
+  <view class="weekday-row">
+    <view
+      class="weekday-cell"
+      wx:for="{{weekdays}}"
+      wx:key="*this"
+    >
+      <text class="{{index === 0 || index === 6 ? 'text-weekend' : ''}}">{{item}}</text>
+    </view>
+  </view>
+
+  <!-- ====== 日历网格 ====== -->
+  <view class="calendar-grid">
+    <view
+      wx:for="{{calendarGrid}}"
+      wx:key="date"
+      class="day-cell {{!item.isCurrentMonth ? 'dimmed' : ''}}{{item.isWeekend && item.isCurrentMonth && !item.isMarked && !item.isPredicted ? 'weekend' : ''}}{{item.isToday && !item.isMarked && !item.isPredicted ? 'today' : ''}}{{item.isMarked && !item.isPeriodStart && !item.isPeriodEnd ? 'period-mid' : ''}}{{item.isPeriodStart ? 'period-start' : ''}}{{item.isPeriodEnd ? 'period-end' : ''}}{{item.isPending && !item.isMarked ? 'pending' : ''}}{{item.isOvulation ? 'ovulation' : ''}}{{item.isPredicted ? 'predicted' : ''}}"
+      data-date="{{item.date}}"
+      data-iscurrentmonth="{{item.isCurrentMonth}}"
+      bindtap="onDayTap"
+    >
+      <view class="day-num">{{item.day}}</view>
+      <!-- 排卵日圆点 -->
+      <view class="ovu-dot" wx:if="{{item.isOvulation}}"></view>
+      <!-- 经期首尾标签 -->
+      <view class="day-tag start-tag" wx:if="{{item.isPeriodStart}}">始</view>
+      <view class="day-tag end-tag" wx:if="{{item.isPeriodEnd}}">终</view>
+    </view>
+  </view>
+
+  <!-- ====== 图例 ====== -->
+  <view class="section-card legend-card">
+    <view class="card-header" bindtap="toggleLegend">
+      <text class="card-title">图例说明</text>
+      <text class="card-arrow">{{showLegend ? '▲' : '▼'}}</text>
+    </view>
+    <view class="legend-row" wx:if="{{showLegend}}">
+      <view class="legend-item">
+        <view class="legend-swatch swatch-period"></view>
+        <text>经期</text>
+      </view>
+      <view class="legend-item">
+        <view class="legend-swatch swatch-ovulation"></view>
+        <text>排卵日</text>
+      </view>
+      <view class="legend-item">
+        <view class="legend-swatch swatch-predicted"></view>
+        <text>预测经期</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- ====== 统计面板 ====== -->
+  <view class="section-card stats-card">
+    <view class="card-header">
+      <text class="card-title">周期统计</text>
+      <text class="card-sub" wx:if="{{periodCount > 0}}">已记录 {{periodCount}} 次</text>
+    </view>
+
+    <view class="stats-grid">
+      <view class="stat-item">
+        <view class="stat-value">{{avgCycleLength}}<text class="stat-unit"> 天</text></view>
+        <view class="stat-label">平均周期</view>
+      </view>
+      <view class="stat-item">
+        <view class="stat-value">{{avgPeriodLength}}<text class="stat-unit"> 天</text></view>
+        <view class="stat-label">平均经期</view>
+      </view>
+      <view class="stat-item">
+        <view class="stat-value">{{lastPeriodStart || '--'}}</view>
+        <view class="stat-label">上次经期</view>
+      </view>
+      <view class="stat-item">
+        <view class="stat-value highlight">{{nextPeriodStart || '--'}}</view>
+        <view class="stat-label">预测下次</view>
+      </view>
+    </view>
+
+    <!-- 未来一年预测经期列表 -->
+    <view class="upcoming-section" wx:if="{{upcomingPeriods.length > 0}}">
+      <view class="upcoming-title">未来一年预测经期</view>
+      <view class="upcoming-list">
+        <view class="upcoming-item" wx:for="{{upcomingPeriods}}" wx:key="*this">
+          <view class="upcoming-dot"></view>
+          <text class="upcoming-date">{{item}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- ====== 周期设置 ====== -->
+  <view class="section-card settings-card">
+    <view class="card-header">
+      <text class="card-title">周期设置</text>
+      <text class="card-sub">自定义后优先使用</text>
+    </view>
+    <view class="settings-row">
+      <view class="setting-label">
+        <text class="setting-name">周期天数</text>
+        <text class="setting-hint">两次经期开始日间隔</text>
+      </view>
+      <view class="setting-stepper">
+        <view class="stepper-btn" bindtap="changeCycleLength" data-delta="{{-1}}">−</view>
+        <text class="stepper-value">{{customCycleLength || avgCycleLength}} 天</text>
+        <view class="stepper-btn" bindtap="changeCycleLength" data-delta="{{1}}">+</view>
+      </view>
+    </view>
+    <view class="settings-row">
+      <view class="setting-label">
+        <text class="setting-name">经期天数</text>
+        <text class="setting-hint">每次持续天数</text>
+      </view>
+      <view class="setting-stepper">
+        <view class="stepper-btn" bindtap="changePeriodLength" data-delta="{{-1}}">−</view>
+        <text class="stepper-value">{{customPeriodLength || avgPeriodLength}} 天</text>
+        <view class="stepper-btn" bindtap="changePeriodLength" data-delta="{{1}}">+</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- ====== 使用提示 ====== -->
+  <view class="tips-card" wx:if="{{markedDates.length === 0}}">
+    <view class="tips-icon">💡</view>
+    <view class="tips-text">
+      <view class="tips-title">开始使用</view>
+      <view class="tips-desc">点击日历上的日期标记经期范围：<text class="bold">第一次点击</text>选择开始日期，<text class="bold">第二次点击</text>选择结束日期。</view>
+      <view class="tips-desc">点击已标记的日期可<text class="bold">清除</text>该段经期记录。</view>
+    </view>
+  </view>
+
+  <!-- ====== 底部 ====== -->
+  <view class="footer">
+    <button class="reset-btn" bindtap="resetAll">重置所有数据</button>
+    <view class="footer-text">数据仅保存在本地，不会上传</view>
+  </view>
+
+</view>

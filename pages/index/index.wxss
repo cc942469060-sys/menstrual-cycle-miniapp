@@ -1,0 +1,573 @@
+/* ==================== 基础 ==================== */
+.container {
+  padding: 0 24rpx 60rpx;
+}
+
+/* ==================== 头部 ==================== */
+.header {
+  text-align: center;
+  padding: 48rpx 0 28rpx;
+}
+.header-title {
+  font-size: 44rpx;
+  font-weight: 700;
+  color: #FF6B8A;
+  letter-spacing: 4rpx;
+}
+.header-subtitle {
+  font-size: 24rpx;
+  color: #C49DA4;
+  margin-top: 10rpx;
+}
+
+/* ==================== 月份导航 ==================== */
+.month-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16rpx 24rpx;
+}
+.nav-btn {
+  width: 72rpx;
+  height: 72rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 4rpx 16rpx rgba(255, 107, 138, 0.10);
+}
+.nav-arrow {
+  font-size: 44rpx;
+  color: #FF6B8A;
+  font-weight: 300;
+  margin-top: -4rpx;
+}
+.month-title {
+  font-size: 34rpx;
+  font-weight: 600;
+  color: #333;
+  padding: 12rpx 36rpx;
+  border-radius: 40rpx;
+  background: #fff;
+  box-shadow: 0 2rpx 12rpx rgba(0,0,0,0.04);
+}
+
+/* ==================== 今天按钮 ==================== */
+.today-bar {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 16rpx;
+}
+.today-btn-centered {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14rpx 48rpx;
+  background: #fff;
+  border-radius: 32rpx;
+  border: 2rpx solid #FF6B8A;
+  box-shadow: 0 2rpx 12rpx rgba(255, 107, 138, 0.10);
+}
+.today-btn-text {
+  font-size: 26rpx;
+  color: #FF6B8A;
+  font-weight: 600;
+}
+
+.pending-tip {
+  text-align: center;
+  font-size: 24rpx;
+  color: #FF6B8A;
+  margin-bottom: 12rpx;
+  background: #FFF0F3;
+  padding: 12rpx 20rpx;
+  border-radius: 12rpx;
+}
+.pending-date {
+  font-weight: 700;
+}
+
+/* ==================== 星期行 ==================== */
+.weekday-row {
+  display: flex;
+  background: #fff;
+  border-radius: 20rpx 20rpx 0 0;
+  padding: 18rpx 0 10rpx;
+}
+.weekday-cell {
+  flex: 1;
+  text-align: center;
+  font-size: 26rpx;
+  color: #888;
+}
+.text-weekend { color: #FF6B8A; }
+
+/* ==================== 日历网格 ==================== */
+.calendar-grid {
+  display: flex;
+  flex-wrap: wrap;
+  background: #fff;
+  border-radius: 0 0 20rpx 20rpx;
+  padding-bottom: 16rpx;
+  box-shadow: 0 4rpx 20rpx rgba(0,0,0,0.04);
+}
+
+.day-cell {
+  width: calc(100% / 7);
+  height: 100rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.day-num {
+  font-size: 28rpx;
+  color: #333;
+  width: 56rpx;
+  height: 56rpx;
+  line-height: 56rpx;
+  text-align: center;
+  border-radius: 50%;
+  position: relative;
+}
+
+.day-tag {
+  font-size: 18rpx;
+  color: #fff;
+  position: absolute;
+  top: 4rpx;
+  padding: 0 8rpx;
+  border-radius: 16rpx;
+  line-height: 1.6;
+}
+.start-tag { background: #E8738A; right: 4rpx; }
+.end-tag   { background: #E8738A; left: 4rpx; }
+
+.ovu-dot {
+  width: 10rpx;
+  height: 10rpx;
+  border-radius: 50%;
+  background: #5BA0F5;
+  margin-top: 2rpx;
+}
+
+/* ---- 非当月 ---- */
+.day-cell.dimmed .day-num { color: #ddd; }
+
+/* ---- 周末 ---- */
+.day-cell.weekend .day-num { color: #FF8FA3; }
+
+/* ---- 今天（仅非经期/非预测日显示） ---- */
+.day-cell.today .day-num {
+  color: #5BA0F5;
+  font-weight: 700;
+  border: 3rpx solid #5BA0F5;
+}
+
+/* ---- 待定开始日（仅非经期日显示，经期日由 period-* 样式主导） ---- */
+.day-cell.pending .day-num {
+  color: #FF6B8A;
+  border: 3rpx solid #FF6B8A;
+}
+
+/* ---- 经期中间日 ---- */
+.day-cell.period-mid { background: #FFE0E6; }
+.day-cell.period-mid .day-num { color: #333; }
+
+/* ---- 经期首/尾 ---- */
+.day-cell.period-start {
+  background: #FF9EAF;
+  border-radius: 16rpx 0 0 16rpx;
+}
+.day-cell.period-end {
+  background: #FF9EAF;
+  border-radius: 0 16rpx 16rpx 0;
+}
+.day-cell.period-start.period-end {
+  border-radius: 16rpx;
+}
+.day-cell.period-start .day-num,
+.day-cell.period-end .day-num {
+  color: #fff;
+  font-weight: 700;
+}
+
+/* ---- 排卵日 ---- */
+.day-cell.ovulation .ovu-dot {
+  width: 14rpx;
+  height: 14rpx;
+  background: #5BA0F5;
+}
+
+/* ---- 预测经期 ---- */
+.day-cell.predicted { background: #FFF5F7; }
+.day-cell.predicted .day-num {
+  color: #FF6B8A;
+  border: 2rpx dashed #FFB6C1;
+}
+
+/* ==================== 图例卡片 ==================== */
+.section-card {
+  margin-top: 24rpx;
+  background: #fff;
+  border-radius: 20rpx;
+  padding: 24rpx;
+  box-shadow: 0 2rpx 16rpx rgba(0,0,0,0.04);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.card-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #333;
+}
+.card-sub {
+  font-size: 22rpx;
+  color: #999;
+}
+.card-arrow {
+  font-size: 22rpx;
+  color: #ccc;
+}
+
+.legend-row {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 20rpx;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  margin-right: 36rpx;
+  margin-bottom: 14rpx;
+  font-size: 24rpx;
+  color: #666;
+}
+.legend-swatch {
+  width: 30rpx;
+  height: 30rpx;
+  border-radius: 8rpx;
+  margin-right: 10rpx;
+}
+.swatch-period    { background: #FF9EAF; }
+.swatch-ovulation { background: #5BA0F5; }
+.swatch-predicted { background: #FFF5F7; border: 2rpx dashed #FFB6C1; }
+
+/* ==================== 统计面板 ==================== */
+.stats-card { margin-top: 24rpx; }
+
+.stats-grid {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 20rpx;
+}
+.stat-item {
+  width: 50%;
+  margin-bottom: 22rpx;
+}
+.stat-value {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #333;
+  word-break: break-all;
+}
+.stat-value.highlight {
+  color: #FF6B8A;
+}
+.stat-unit {
+  font-size: 22rpx;
+  font-weight: 400;
+  color: #999;
+}
+.stat-label {
+  font-size: 22rpx;
+  color: #999;
+  margin-top: 6rpx;
+}
+
+/* ==================== 未来预测列表 ==================== */
+.upcoming-section {
+  margin-top: 24rpx;
+  padding-top: 20rpx;
+  border-top: 1rpx solid #f5f5f5;
+}
+.upcoming-title {
+  font-size: 24rpx;
+  color: #999;
+  margin-bottom: 16rpx;
+}
+.upcoming-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx 24rpx;
+}
+.upcoming-item {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+.upcoming-dot {
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 50%;
+  background: #FF6B8A;
+  flex-shrink: 0;
+}
+.upcoming-date {
+  font-size: 24rpx;
+  color: #333;
+}
+
+/* ==================== 周期设置 ==================== */
+.settings-card { margin-top: 24rpx; }
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 24rpx;
+  padding-top: 20rpx;
+  border-top: 1rpx solid #f5f5f5;
+}
+.setting-label {
+  display: flex;
+  flex-direction: column;
+}
+.setting-name {
+  font-size: 26rpx;
+  color: #333;
+  font-weight: 500;
+}
+.setting-hint {
+  font-size: 20rpx;
+  color: #bbb;
+  margin-top: 4rpx;
+}
+.setting-stepper {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+.stepper-btn {
+  width: 48rpx;
+  height: 48rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #FFF0F3;
+  border-radius: 50%;
+  font-size: 28rpx;
+  color: #FF6B8A;
+  font-weight: 600;
+}
+.stepper-value {
+  font-size: 26rpx;
+  color: #333;
+  font-weight: 600;
+  min-width: 64rpx;
+  text-align: center;
+}
+
+/* ==================== 使用提示 ==================== */
+.tips-card {
+  margin-top: 24rpx;
+  background: #FFF9E6;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  display: flex;
+}
+.tips-icon {
+  font-size: 40rpx;
+  margin-right: 16rpx;
+  flex-shrink: 0;
+}
+.tips-title {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #B8860B;
+  margin-bottom: 8rpx;
+}
+.tips-desc {
+  font-size: 24rpx;
+  color: #9A7D2F;
+  line-height: 1.7;
+  margin-bottom: 8rpx;
+}
+.tips-desc .bold {
+  font-weight: 600;
+  color: #7A6018;
+}
+
+/* ==================== 底部 ==================== */
+.footer {
+  margin-top: 48rpx;
+  text-align: center;
+}
+.reset-btn {
+  font-size: 24rpx !important;
+  color: #ccc !important;
+  background: none !important;
+  border: none !important;
+  line-height: 1 !important;
+}
+.reset-btn::after { border: none; }
+.footer-text {
+  font-size: 20rpx;
+  color: #ddd;
+  margin-top: 12rpx;
+}
+
+/* ==================== 首次使用设置弹窗 ==================== */
+.setup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.25s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.setup-modal {
+  width: 600rpx;
+  background: #fff;
+  border-radius: 28rpx;
+  padding: 48rpx 40rpx 36rpx;
+  box-shadow: 0 16rpx 48rpx rgba(0, 0, 0, 0.12);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(40rpx); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.setup-header {
+  text-align: center;
+  margin-bottom: 36rpx;
+}
+
+.setup-icon {
+  font-size: 64rpx;
+  margin-bottom: 16rpx;
+}
+
+.setup-title {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #333;
+  margin-bottom: 10rpx;
+}
+
+.setup-desc {
+  font-size: 24rpx;
+  color: #999;
+  line-height: 1.6;
+}
+
+.setup-body {
+  margin-bottom: 32rpx;
+}
+
+.setup-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24rpx 0;
+  border-top: 1rpx solid #f5f5f5;
+}
+
+.setup-row:first-child {
+  border-top: none;
+}
+
+.setup-label {
+  display: flex;
+  flex-direction: column;
+}
+
+.setup-name {
+  font-size: 28rpx;
+  color: #333;
+  font-weight: 500;
+}
+
+.setup-hint {
+  font-size: 22rpx;
+  color: #bbb;
+  margin-top: 4rpx;
+}
+
+.setup-stepper {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+}
+
+.setup-stepper-btn {
+  width: 52rpx;
+  height: 52rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #FFF0F3;
+  border-radius: 50%;
+  font-size: 30rpx;
+  color: #FF6B8A;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.setup-stepper-value {
+  font-size: 28rpx;
+  color: #333;
+  font-weight: 600;
+  min-width: 72rpx;
+  text-align: center;
+}
+
+.setup-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.setup-btn {
+  width: 100%;
+  height: 88rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 44rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+}
+
+.setup-btn-primary {
+  background: linear-gradient(135deg, #FF6B8A, #FF8FA3);
+  color: #fff;
+  box-shadow: 0 6rpx 20rpx rgba(255, 107, 138, 0.25);
+}
+
+.setup-btn-ghost {
+  background: transparent;
+  color: #bbb;
+  font-weight: 400;
+  font-size: 26rpx;
+}
