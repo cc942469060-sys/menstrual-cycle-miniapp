@@ -1,257 +1,242 @@
-/**
- * 获取指定年月的天数（month 为 1-12）
- */
-function getDaysInMonth(year, month) {
-  return new Date(year, month, 0).getDate();
+const DAY_MS = 86400000;
+const CYCLE_MIN = 10;
+const CYCLE_MAX = 180;
+const PERIOD_MAX = 180;
+
+// Date-only values use UTC components; device time zones only determine today.
+function parseDate(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new Error('日期格式应为 YYYY-MM-DD');
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(0);
+  date.setUTCFullYear(year, month - 1, day);
+  date.setUTCHours(0, 0, 0, 0);
+  if (year < 1 || year > 9999 || date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+    throw new Error('日期不存在');
+  }
+  return date;
 }
 
-/**
- * 获取指定年月第一天是星期几（0=周日，month 为 1-12）
- */
-function getFirstDayOfWeek(year, month) {
-  return new Date(year, month - 1, 1).getDay();
+function formatUTC(date) {
+  if (!Number.isFinite(date.getTime()) || date.getUTCFullYear() < 1 || date.getUTCFullYear() > 9999) throw new Error('日期超出支持范围');
+  return `${String(date.getUTCFullYear()).padStart(4, '0')}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
 }
 
-/**
- * 格式化日期为 YYYY-MM-DD
- */
 function formatDate(date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  if (!date || !Number.isFinite(date.getTime())) throw new Error('日期无效');
+  return `${String(date.getFullYear()).padStart(4, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
-/**
- * 解析 YYYY-MM-DD 字符串为 Date
- */
-function parseDate(str) {
-  const [y, m, d] = str.split('-').map(Number);
-  return new Date(y, m - 1, d);
+function dateNumber(value) {
+  return parseDate(typeof value === 'string' ? value : formatDate(value)).getTime() / DAY_MS;
 }
 
-/**
- * 两个日期相隔的天数（date1/date2 可以是字符串或 Date）
- */
-function daysBetween(d1, d2) {
-  const a = typeof d1 === 'string' ? parseDate(d1) : d1;
-  const b = typeof d2 === 'string' ? parseDate(d2) : d2;
-  return Math.round((b - a) / 86400000);
+function daysBetween(start, end) { return dateNumber(end) - dateNumber(start); }
+
+function addDays(value, days) {
+  if (!Number.isSafeInteger(days)) throw new Error('天数必须是整数');
+  return formatUTC(new Date((dateNumber(value) + days) * DAY_MS));
 }
 
-/**
- * 在指定日期上加 N 天，返回 YYYY-MM-DD 字符串
- */
-function addDays(dateStr, n) {
-  const d = typeof dateStr === 'string' ? parseDate(dateStr) : new Date(dateStr);
-  d.setDate(d.getDate() + n);
-  return formatDate(d);
+function isDate(value) { try { parseDate(value); return true; } catch (e) { return false; } }
+
+function getDaysInMonth(year, month) {
+  if (!Number.isInteger(year) || year < 1 || year > 9999 || !Number.isInteger(month) || month < 1 || month > 12) throw new Error('年月无效');
+  return month === 2 ? (year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0) ? 29 : 28) : ([4, 6, 9, 11].includes(month) ? 30 : 31);
 }
 
-/**
- * 根据已记录的经期列表计算统计数据
- * periods: [{ start, end }]
- */
-function calculateStats(periods) {
-  if (!periods || periods.length === 0) {
-    return { avgCycleLength: 28, avgPeriodLength: 5, lastPeriodStart: '', lastPeriodEnd: '' };
-  }
+function monthStart(year, month) { getDaysInMonth(year, month); return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-01`; }
+function getFirstDayOfWeek(year, month) { return parseDate(monthStart(year, month)).getUTCDay(); }
 
-  const sorted = [...periods].sort((a, b) => a.start.localeCompare(b.start));
-
-  // 经期长度
-  const periodLengths = sorted.map(p => daysBetween(p.start, p.end) + 1);
-  const avgPeriodLength = Math.round(periodLengths.reduce((s, v) => s + v, 0) / periodLengths.length);
-
-  // 周期长度（相邻两次经期开始日之差）
-  const cycleLengths = [];
-  for (let i = 1; i < sorted.length; i++) {
-    const len = daysBetween(sorted[i - 1].start, sorted[i].start);
-    if (len >= 18 && len <= 45) cycleLengths.push(len); // 过滤异常值
-  }
-
-  const avgCycleLength = cycleLengths.length > 0
-    ? Math.round(cycleLengths.reduce((s, v) => s + v, 0) / cycleLengths.length)
-    : 28;
-
-  const last = sorted[sorted.length - 1];
-
-  return {
-    avgCycleLength,
-    avgPeriodLength,
-    lastPeriodStart: last.start,
-    lastPeriodEnd: last.end,
-  };
-}
-
-/**
- * 预测下一次经期（简单版，使用固定周期长度）
- */
-function predictNextPeriod(lastStart, cycleLength) {
-  if (!lastStart) return null;
-  return {
-    start: addDays(lastStart, cycleLength),
-    end: addDays(lastStart, cycleLength + 4),
-  };
-}
-
-/**
- * 移动平均法预测下一次经期
- * 取最近 3~12 个历史周期的平均长度来推算
- * @param {Array} periods - 已排序的经期段落 [{ start, end }]
- * @param {number} minSamples - 最少需要的历史周期数，默认 3
- * @param {number} maxSamples - 最多取多少个历史周期，默认 12
- * @returns {Object|null} { avgCycleLength, nextStart }
- */
-function predictWithMovingAverage(periods, minSamples, maxSamples) {
-  if (!periods || periods.length < 2) return null;
-  if (minSamples === undefined) minSamples = 3;
-  if (maxSamples === undefined) maxSamples = 12;
-
-  const sorted = [...periods].sort((a, b) => a.start.localeCompare(b.start));
-
-  // 计算所有相邻经期开始日之间的周期长度
-  const cycleLengths = [];
-  for (let i = 1; i < sorted.length; i++) {
-    const len = daysBetween(sorted[i - 1].start, sorted[i].start);
-    // 过滤异常值：正常月经周期范围 18~45 天
-    if (len >= 18 && len <= 45) {
-      cycleLengths.push(len);
-    }
-  }
-
-  // 需要至少 minSamples 个有效周期才能应用移动平均法
-  if (cycleLengths.length < minSamples) return null;
-
-  // 取最近 N 个周期（最多 maxSamples 个）
-  const samples = cycleLengths.slice(-Math.min(maxSamples, cycleLengths.length));
-
-  // 简单移动平均（SMA）
-  const sum = samples.reduce((s, v) => s + v, 0);
-  const avgCycle = Math.round(sum / samples.length);
-
-  const lastPeriod = sorted[sorted.length - 1];
-
-  return {
-    avgCycleLength: avgCycle,
-    nextStart: addDays(lastPeriod.start, avgCycle),
-  };
-}
-
-/**
- * 预测排卵日（标准公式：下次经期第 1 天 − 14 天）
- */
-function getOvulationDay(nextPeriodStart) {
-  if (!nextPeriodStart) return '';
-  return addDays(nextPeriodStart, -14);
-}
-
-/**
- * 生成日历网格（固定 42 格）
- * markedSet / predictedSet / ovulationDay 用于渲染高亮
- */
-function generateCalendarGrid(year, month, markedSet, predictedSet, ovulationDay, pendingStart) {
-  const daysInMonth = getDaysInMonth(year, month);
-  const firstDow = getFirstDayOfWeek(year, month);
-  const today = formatDate(new Date());
-
-  const grid = [];
-
-  // ---- 上月填充 ----
-  const prevMonth = month === 1 ? 12 : month - 1;
-  const prevYear = month === 1 ? year - 1 : year;
-  const prevDays = getDaysInMonth(prevYear, prevMonth);
-  for (let i = firstDow - 1; i >= 0; i--) {
-    const day = prevDays - i;
-    const dateStr = `${prevYear}-${String(prevMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    grid.push(buildCell(dateStr, day, false, today, markedSet, predictedSet, ovulationDay, pendingStart, prevYear, prevMonth));
-  }
-
-  // ---- 当月 ----
-  for (let day = 1; day <= daysInMonth; day++) {
-    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    grid.push(buildCell(dateStr, day, true, today, markedSet, predictedSet, ovulationDay, pendingStart, year, month));
-  }
-
-  // ---- 下月填充 ----
-  const remaining = 42 - grid.length;
-  const nextMonth = month === 12 ? 1 : month + 1;
-  const nextYear = month === 12 ? year + 1 : year;
-  for (let day = 1; day <= remaining; day++) {
-    const dateStr = `${nextYear}-${String(nextMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    grid.push(buildCell(dateStr, day, false, today, markedSet, predictedSet, ovulationDay, pendingStart, nextYear, nextMonth));
-  }
-
-  return grid;
-}
-
-function buildCell(dateStr, day, isCurrentMonth, today, markedSet, predictedSet, ovulationDay, pendingStart, year, month) {
-  const isToday = dateStr === today;
-  const isMarked = markedSet.has(dateStr);
-  const isPredicted = predictedSet.has(dateStr);
-  const isOvulation = ovulationDay === dateStr;
-  const isPending = pendingStart === dateStr;
-  const d = new Date(year, month - 1, day);
-  const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-
-  return {
-    date: dateStr,
-    day,
-    isCurrentMonth,
-    isToday,
-    isMarked,
-    isPredicted,
-    isOvulation,
-    isPending,
-    isWeekend,
-  };
-}
-
-/**
- * 从已标记日期中提取连续经期段落
- */
 function extractPeriods(markedDates) {
-  if (!markedDates || markedDates.length === 0) return [];
-  const sorted = [...markedDates].sort();
+  if (!Array.isArray(markedDates)) throw new Error('日期记录必须是数组');
+  const sorted = [...new Set(markedDates)].sort();
+  sorted.forEach(parseDate);
   const periods = [];
-  let start = sorted[0];
-  let prev = sorted[0];
-  for (let i = 1; i < sorted.length; i++) {
-    if (sorted[i] !== addDays(prev, 1)) {
-      periods.push({ start, end: prev });
-      start = sorted[i];
-    }
-    prev = sorted[i];
-  }
-  periods.push({ start, end: prev });
+  sorted.forEach(date => {
+    const last = periods[periods.length - 1];
+    if (last && daysBetween(last.end, date) === 1) last.end = date;
+    else periods.push({ start: date, end: date });
+  });
   return periods;
 }
 
-/**
- * 从经期段落中标记首位日期，返回 { startSet, endSet }
- */
-function getPeriodBoundaries(periods) {
-  const startSet = new Set();
-  const endSet = new Set();
-  periods.forEach(p => {
-    startSet.add(p.start);
-    endSet.add(p.end);
+function mean(values) { return values.length ? Math.round(values.reduce((sum, n) => sum + n, 0) / values.length) : null; }
+
+function calculateStats(periods) {
+  if (!Array.isArray(periods)) throw new Error('经期记录必须是数组');
+  const sorted = periods.filter(p => p.status !== 'needsReview').slice().sort((a, b) => a.start.localeCompare(b.start));
+  const periodLengths = [];
+  sorted.forEach(p => {
+    parseDate(p.start);
+    if (p.end !== null && p.end !== undefined) {
+      const duration = daysBetween(p.start, p.end) + 1;
+      if (duration < 1) throw new Error('结束日期不能早于开始日期');
+      periodLengths.push(duration);
+    }
   });
-  return { startSet, endSet };
+  const recordedIntervals = [];
+  const cycleLengths = [];
+  const excludedIntervals = [];
+  for (let i = 1; i < sorted.length; i++) {
+    const length = daysBetween(sorted[i - 1].start, sorted[i].start);
+    if (length <= 0) throw new Error('经期开始日期不能重复');
+    recordedIntervals.push(length);
+    if (sorted[i].excludeGap) excludedIntervals.push({ start: sorted[i - 1].start, end: sorted[i].start, length, reason: '用户标记漏录' });
+    else cycleLengths.push(length);
+  }
+  const last = sorted[sorted.length - 1];
+  return {
+    avgCycleLength: mean(cycleLengths), avgPeriodLength: mean(periodLengths),
+    avgRecordedInterval: mean(recordedIntervals), cycleLengths, recordedIntervals, excludedIntervals,
+    cycleSampleCount: cycleLengths.length, periodSampleCount: periodLengths.length,
+    minCycleLength: cycleLengths.length ? Math.min(...cycleLengths) : null,
+    maxCycleLength: cycleLengths.length ? Math.max(...cycleLengths) : null,
+    lastPeriodStart: last ? last.start : '', lastPeriodEnd: last ? (last.end || '') : '',
+    periodCount: sorted.length, reviewCount: periods.length - sorted.length,
+  };
 }
 
-module.exports = {
-  getDaysInMonth,
-  getFirstDayOfWeek,
-  formatDate,
-  parseDate,
-  daysBetween,
-  addDays,
-  calculateStats,
-  predictNextPeriod,
-  predictWithMovingAverage,
-  getOvulationDay,
-  generateCalendarGrid,
-  extractPeriods,
-  getPeriodBoundaries,
-};
+function predictNextPeriod(lastStart, cycleLength, periodLength = 5) {
+  if (!lastStart) return null;
+  if (!Number.isInteger(cycleLength) || cycleLength < CYCLE_MIN || cycleLength > CYCLE_MAX || !Number.isInteger(periodLength) || periodLength < 1 || periodLength >= cycleLength) throw new Error('预测天数不适用于固定周期模型');
+  const start = addDays(lastStart, cycleLength);
+  return { start, end: addDays(start, periodLength - 1) };
+}
+
+function predictWithMovingAverage(periods, minSamples = 3, maxSamples = 12) {
+  if (!Number.isInteger(minSamples) || minSamples < 1 || !Number.isInteger(maxSamples) || maxSamples < minSamples || maxSamples > 120) throw new Error('样本数量无效');
+  const stats = calculateStats(periods);
+  const samples = stats.cycleLengths.slice(-maxSamples);
+  if (samples.length < minSamples) return null;
+  const avgCycleLength = mean(samples);
+  return { avgCycleLength, nextStart: addDays(stats.lastPeriodStart, avgCycleLength), sampleCount: samples.length, min: Math.min(...samples), max: Math.max(...samples) };
+}
+
+function getOvulationDay(nextStart) { return nextStart ? addDays(nextStart, -14) : ''; }
+
+function getFertileWindow(earliestNextStart, latestNextStart = earliestNextStart) {
+  const ovulationStart = addDays(earliestNextStart, -16);
+  const ovulationEnd = addDays(latestNextStart, -10);
+  return { ovulationStart, ovulationEnd, fertileStart: addDays(ovulationStart, -5), fertileEnd: ovulationEnd };
+}
+
+function computePredictions(state, today) {
+  parseDate(today);
+  const futureRecords = state.periods.filter(p => p.status !== 'needsReview' && (p.start > today || (p.end && p.end > today)));
+  const stats = calculateStats(state.periods.filter(p => !futureRecords.includes(p)));
+  stats.reviewCount += futureRecords.length;
+  const prefs = state.preferences;
+  const samples = stats.cycleLengths.slice(-12);
+  const min = samples.length ? Math.min(...samples) : prefs.initialCycleLength;
+  const max = samples.length ? Math.max(...samples) : prefs.initialCycleLength;
+  const spread = max - min;
+  const manual = prefs.predictionMode === 'manual';
+  const cycleLength = manual ? prefs.manualCycleLength : (mean(samples) || prefs.initialCycleLength);
+  const periodLength = manual ? prefs.manualPeriodLength : (stats.avgPeriodLength || prefs.initialPeriodLength);
+  const hasOngoing = state.periods.some(p => p.status === 'ongoing');
+  const recentGapExcluded = state.periods.filter(p => p.status !== 'needsReview').sort((a, b) => a.start.localeCompare(b.start)).slice(-1).some(p => p.excludeGap);
+  // Model gates are product heuristics, not diagnostic definitions of regularity.
+  let quality = samples.length >= 3 && spread <= 7 && min >= 18 && max <= 45 && !recentGapExcluded ? 'regular' : 'limited';
+  let message = quality === 'regular' ? '按最近记录估计，远期日期的不确定性会增大。' : '样本不足或超出模型适用范围，日期仅作粗略参考，不推算易孕期。';
+  if (spread > 7) { quality = 'irregular'; message = '记录间隔波动较大，请核对漏录；仅显示可能日期范围，不推算易孕期。'; }
+  if (manual && (cycleLength < min || cycleLength > max)) { quality = 'limited'; message = '使用手动参数，与已记录间隔不同；不推算易孕期。'; }
+  if (recentGapExcluded) message = '最近间隔已标记漏录；使用其他记录作粗略参考，不推算易孕期。';
+  if (!Number.isInteger(cycleLength) || cycleLength < CYCLE_MIN || cycleLength > CYCLE_MAX || !Number.isInteger(periodLength) || periodLength < 1 || periodLength >= cycleLength) {
+    quality = 'unavailable'; message = '当前经期长度或间隔不适合固定周期模型，真实记录已保留。';
+  }
+  const result = {
+    ...stats, effectiveCycleLength: cycleLength, effectivePeriodLength: periodLength,
+    modelSource: manual ? '手动参数' : (samples.length ? `最近 ${samples.length} 个已记录间隔` : '初始参考参数'),
+    quality, predictionMessage: message, nextPeriodStart: '', nextPeriodEnd: '', predictionStatus: 'empty',
+    predictionStatusText: '尚无确认的开始记录', overdueDays: 0, expectedWindowStart: '', expectedWindowEnd: '',
+    predictedDates: [], upcomingPeriods: [], ovulationDates: [], fertileDates: [], ovulationWindow: '', fertileWindow: '',
+  };
+  if (futureRecords.length) return { ...result, quality: 'unavailable', predictionStatus: 'review', predictionStatusText: '请核对既有记录日期', predictionMessage: '既有记录晚于当前所在地的今天。原日期已保留，请核对设备日期或编辑记录，暂不预测。' };
+  if (!stats.lastPeriodStart) return result;
+  if (hasOngoing) return { ...result, predictionStatus: 'ongoing', predictionStatusText: '本次经期进行中', predictionMessage: '结束日期尚未确认，确认结束后再推算下一次。' };
+  if (quality === 'unavailable') return { ...result, predictionStatus: 'unavailable', predictionStatusText: '暂不提供固定日期预测' };
+  const rangeMin = manual ? cycleLength : min;
+  const rangeMax = manual ? cycleLength : max;
+  result.expectedWindowStart = addDays(stats.lastPeriodStart, rangeMin);
+  result.expectedWindowEnd = addDays(stats.lastPeriodStart, rangeMax);
+  const next = predictNextPeriod(stats.lastPeriodStart, cycleLength, periodLength);
+  if (quality !== 'irregular' || manual) {
+    result.nextPeriodStart = next.start;
+    result.nextPeriodEnd = next.end;
+  }
+  const due = result.nextPeriodStart || result.expectedWindowEnd;
+  result.overdueDays = Math.max(0, daysBetween(due, today));
+  result.predictionStatus = due < today ? 'overdue' : (due === today ? 'due' : 'upcoming');
+  result.predictionStatusText = result.predictionStatus === 'overdue' ? `预计日期已过 ${result.overdueDays} 天，尚未确认` : (result.predictionStatus === 'due' ? '预计今天开始，尚未确认' : '预计日期尚未到');
+  if (!result.nextPeriodStart) return result;
+  const endLimit = addDays(today, 365);
+  const predicted = new Set();
+  const ovu = new Set();
+  const fertile = new Set();
+  const covered = date => state.periods.some(p => p.status === 'completed' && date >= p.start && date <= p.end);
+  const maxIterations = Math.ceil(365 / cycleLength) + 2;
+  // Retain the first expected date; never silently advance over missing records.
+  for (let i = 1; i <= maxIterations; i++) {
+    const start = addDays(stats.lastPeriodStart, i * cycleLength);
+    if (start > endLimit || (i > 1 && (quality !== 'regular' || result.predictionStatus === 'overdue'))) break;
+    const end = addDays(start, periodLength - 1);
+    for (let day = 0; day < periodLength; day++) {
+      const date = addDays(start, day);
+      if (date <= endLimit && !covered(date)) predicted.add(date);
+    }
+    const entry = { start, end, ovulationStart: '', ovulationEnd: '', fertileStart: '', fertileEnd: '' };
+    if (quality === 'regular' && result.predictionStatus !== 'overdue') {
+      const window = getFertileWindow(addDays(stats.lastPeriodStart, i * rangeMin), addDays(stats.lastPeriodStart, i * rangeMax));
+      Object.assign(entry, window);
+      for (let n = 0, length = daysBetween(window.ovulationStart, window.ovulationEnd); n <= length; n++) {
+        const date = addDays(window.ovulationStart, n);
+        if (date <= endLimit && !covered(date)) ovu.add(date);
+      }
+      for (let n = 0, length = daysBetween(window.fertileStart, window.fertileEnd); n <= length; n++) {
+        const date = addDays(window.fertileStart, n);
+        if (date <= endLimit && !covered(date)) fertile.add(date);
+      }
+      if (i === 1) {
+        result.ovulationWindow = `${window.ovulationStart} ~ ${window.ovulationEnd}`;
+        result.fertileWindow = `${window.fertileStart} ~ ${window.fertileEnd}`;
+      }
+    }
+    if (start >= today) result.upcomingPeriods.push(entry);
+  }
+  result.predictedDates = [...predicted].sort();
+  result.ovulationDates = [...ovu].sort();
+  result.fertileDates = [...fertile].sort();
+  if (result.predictionStatus === 'overdue') result.predictionMessage += ' 请确认实际开始日或补录；未继续外推后续周期。';
+  return result;
+}
+
+function generateCalendarGrid(year, month, periods, predictions, draft, today) {
+  const first = monthStart(year, month);
+  const start = addDays(first, -getFirstDayOfWeek(year, month));
+  const predicted = new Set(predictions.predictedDates);
+  const ovulation = new Set(predictions.ovulationDates);
+  const fertile = new Set(predictions.fertileDates);
+  return Array.from({ length: 42 }, (_, index) => {
+    const date = addDays(start, index);
+    const parsed = parseDate(date);
+    const hit = periods.find(p => date >= p.start && date <= (p.end || p.start));
+    const unreviewed = hit && (hit.status === 'needsReview' || hit.start > today || (hit.end && hit.end > today));
+    const confirmed = hit && !unreviewed;
+    return {
+      date, day: parsed.getUTCDate(), isCurrentMonth: parsed.getUTCMonth() + 1 === month && parsed.getUTCFullYear() === year,
+      isToday: date === today, isFuture: date > today, isWeekend: [0, 6].includes(parsed.getUTCDay()),
+      periodId: hit ? hit.id : '', isMarked: !!confirmed, isUnreviewed: !!unreviewed,
+      isPeriodStart: !!confirmed && date === hit.start, isPeriodEnd: !!confirmed && date === hit.end,
+      isPending: !!draft && date === draft.start, isPredicted: !hit && predicted.has(date),
+      isOvulation: !hit && ovulation.has(date), isFertile: !hit && fertile.has(date),
+    };
+  });
+}
+
+function getPeriodBoundaries(periods) {
+  return { startSet: new Set(periods.map(p => p.start)), endSet: new Set(periods.filter(p => p.end).map(p => p.end)) };
+}
+
+module.exports = { DAY_MS, CYCLE_MIN, CYCLE_MAX, PERIOD_MAX, parseDate, formatDate, formatUTC, isDate, dateNumber, daysBetween, addDays,
+  getDaysInMonth, getFirstDayOfWeek, extractPeriods, calculateStats, predictNextPeriod, predictWithMovingAverage, getOvulationDay,
+  getFertileWindow, computePredictions, generateCalendarGrid, getPeriodBoundaries };

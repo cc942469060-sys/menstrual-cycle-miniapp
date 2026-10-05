@@ -571,3 +571,29 @@
   font-weight: 400;
   font-size: 26rpx;
 }
+
+/* Record editing and uncertainty indicators */
+.notice-card { margin: 20rpx 0; padding: 24rpx; border-radius: 16rpx; background: #FFF9E6; color: #886817; font-size: 24rpx; line-height: 1.6; }
+.error-card { background: #FFF0F3; color: #AD3453; }
+.editor-modal { max-height: 85vh; overflow-y: auto; }
+.editor-row { display: flex; justify-content: space-between; align-items: center; gap: 20rpx; padding: 24rpx 0; border-bottom: 1rpx solid #F2F2F2; font-size: 26rpx; }
+.date-input { padding: 12rpx 20rpx; border-radius: 12rpx; background: #FFF0F3; color: #B14461; }
+.gap-label { display: flex; flex-direction: column; flex: 1; }
+.editor-actions, .draft-actions { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 24rpx; }
+.primary-action, .secondary-action, .delete-action, .small-action { font-size: 24rpx; margin: 12rpx 0 0; border-radius: 12rpx; }
+.primary-action { background: #FF6B8A; color: #FFF; }
+.secondary-action, .small-action { background: #FFF0F3; color: #A4415C; }
+.delete-action { background: #FFF; color: #B03649; }
+.small-action { margin: 0; padding: 0 20rpx; font-size: 22rpx; }
+.model-note { margin-top: 12rpx; font-size: 22rpx; color: #777; line-height: 1.6; }
+.prediction-status { color: #A4415C; font-size: 26rpx; font-weight: 600; margin-top: 18rpx; }
+.record-row { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; padding: 24rpx 0; border-bottom: 1rpx solid #F5F5F5; }
+.record-date { font-size: 25rpx; color: #333; }
+.record-status { font-size: 22rpx; color: #A4415C; flex-shrink: 0; }
+.review-status { color: #997315; }
+.day-cell.unreviewed { background: #FFF4CD; }
+.review-tag { font-size: 16rpx; color: #997315; position: absolute; bottom: 2rpx; }
+.day-cell.fertile { background: #ECF8EE; }
+.swatch-review { background: #FFF4CD; }
+.swatch-fertile { background: #ECF8EE; }
+.day-cell.today .day-num { border: 3rpx solid #5BA0F5; }

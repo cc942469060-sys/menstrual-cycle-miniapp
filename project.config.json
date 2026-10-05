@@ -1,7 +1,11 @@
 {
   "description": "经期助手 - 记录与预测月经周期",
   "packOptions": {
-    "ignore": [],
+    "ignore": [
+      { "type": "folder", "value": "tests" },
+      { "type": "file", "value": "package.json" },
+      { "type": "file", "value": "README.md" }
+    ],
     "include": []
   },
   "setting": {
