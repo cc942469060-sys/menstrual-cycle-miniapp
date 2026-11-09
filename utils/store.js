@@ -4,6 +4,20 @@ const LEGACY_BACKUP = 'cycle_data_backup_v1';
 const RESET_BACKUP = 'cycle_data_backup_before_reset';
 const LEGACY_LATEST_BACKUP = 'cycle_data_backup_v1_latest';
 const RESET_LATEST_BACKUP = 'cycle_data_backup_before_reset_latest';
+const RESTORE_BACKUP = 'cycle_data_backup_before_restore';
+// Offered most recent first; labels are shown when the user chooses a backup.
+const BACKUP_SLOTS = [
+  { key: RESET_LATEST_BACKUP, label: '最近一次重置前' },
+  { key: RESET_BACKUP, label: '首次重置前' },
+  { key: RESTORE_BACKUP, label: '最近一次恢复或导入前' },
+  { key: LEGACY_LATEST_BACKUP, label: '旧版数据（最近）' },
+  { key: LEGACY_BACKUP, label: '旧版数据（首次）' },
+];
+// Export files wrap the stored record so an import can recognise them and their format version.
+const EXPORT_APP = 'menstrual-cycle-miniapp';
+const EXPORT_FORMAT = 1;
+// One storage key holds at most 1 MB, so anything larger cannot be an export of it.
+const IMPORT_MAX_LENGTH = 1024 * 1024;
 const clone = value => JSON.parse(JSON.stringify(value));
 
 function createState() {
@@ -128,4 +142,93 @@ function reset(storage, today) {
   return save(storage, createState(), today);
 }
 
-module.exports = { KEY, LEGACY_BACKUP, LEGACY_LATEST_BACKUP, RESET_BACKUP, RESET_LATEST_BACKUP, clone, createState, validateState, migrateLegacy, load, save, reset };
+function parseBackup(raw, today) {
+  if (raw && typeof raw === 'object' && raw.schemaVersion === 2) return { state: validateState(raw, today, true), warnings: [] };
+  return migrateLegacy(raw, today);
+}
+
+// Lists restorable backups; empty, unreadable, duplicate, or already-current copies are not offered.
+function listBackups(storage, today) {
+  const seen = new Set();
+  try { seen.add(JSON.stringify(storage.getStorageSync(KEY))); } catch (error) { /* unreadable current data matches nothing */ }
+  const items = [];
+  BACKUP_SLOTS.forEach(slot => {
+    try {
+      const raw = storage.getStorageSync(slot.key);
+      const text = JSON.stringify(raw);
+      if (isMissing(raw) || seen.has(text)) return;
+      const { state } = parseBackup(raw, today);
+      if (!state.periods.length) return;
+      seen.add(text);
+      items.push({ key: slot.key, label: slot.label, count: state.periods.length,
+        first: state.periods[0].start, last: state.periods[state.periods.length - 1].start });
+    } catch (error) { /* invalid backups are left untouched and not offered */ }
+  });
+  return items;
+}
+
+// Replaces the stored data; the current copy stays restorable, so the change can be undone.
+function replaceCurrent(storage, parsed, raw, action) {
+  try {
+    const current = storage.getStorageSync(KEY);
+    if (!isMissing(current) && JSON.stringify(current) !== JSON.stringify(raw)) storage.setStorageSync(RESTORE_BACKUP, clone(current));
+  } catch (error) { return { ok: false, message: `无法备份当前记录，已停止${action}。` }; }
+  try { storage.setStorageSync(KEY, clone(parsed.state)); }
+  catch (error) { return { ok: false, message: `${action}失败，当前记录未改变，请重试。` }; }
+  return { ok: true, state: parsed.state, warnings: parsed.warnings };
+}
+
+function restore(storage, key, today) {
+  if (!BACKUP_SLOTS.some(slot => slot.key === key)) return { ok: false, message: '找不到这份备份。' };
+  let raw;
+  let parsed;
+  try {
+    raw = storage.getStorageSync(key);
+    if (isMissing(raw)) throw new Error('备份为空');
+    parsed = parseBackup(raw, today);
+  } catch (error) { return { ok: false, message: '备份无法读取，当前记录未改动。' }; }
+  return replaceCurrent(storage, parsed, raw, '恢复');
+}
+
+// Builds the text of an export file from the current state.
+function buildExport(state, today) {
+  let valid;
+  try { valid = validateState(state, today, true); } catch (error) { return { ok: false, message: '记录格式异常，暂时无法导出。' }; }
+  if (!valid.periods.length) return { ok: false, message: '还没有可导出的记录。' };
+  const text = JSON.stringify({ app: EXPORT_APP, format: EXPORT_FORMAT, exportedAt: today, data: valid }, null, 2);
+  return { ok: true, text, count: valid.periods.length, fileName: `经期记录备份-${today}.json` };
+}
+
+// Accepts an export file, a bare stored record, or the legacy format, validated like a restore.
+function parseImport(text, today) {
+  if (typeof text !== 'string' || !text.trim()) throw new Error('内容为空');
+  if (text.length > IMPORT_MAX_LENGTH) throw new Error('内容过大');
+  // Files saved by some desktop editors start with a byte-order mark.
+  const raw = JSON.parse(text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text);
+  const wrapped = !!raw && typeof raw === 'object' && !Array.isArray(raw) && raw.app === EXPORT_APP;
+  if (wrapped && raw.format !== EXPORT_FORMAT) throw new Error('备份格式版本不受支持');
+  const data = wrapped ? raw.data : raw;
+  const parsed = parseBackup(data, today);
+  if (!parsed.state.periods.length) throw Object.assign(new Error('备份中没有记录'), { empty: true });
+  return { ...parsed, data };
+}
+
+const importFailure = error => ({ ok: false, message: error.empty ? '备份中没有经期记录，当前记录未改动。' : '无法识别的备份内容，当前记录未改动。' });
+
+// Checks an import without touching storage, for the confirmation dialog.
+function previewImport(text, today) {
+  try {
+    const { state } = parseImport(text, today);
+    return { ok: true, count: state.periods.length, first: state.periods[0].start, last: state.periods[state.periods.length - 1].start };
+  } catch (error) { return importFailure(error); }
+}
+
+function importText(storage, text, today) {
+  let parsed;
+  try { parsed = parseImport(text, today); } catch (error) { return importFailure(error); }
+  return replaceCurrent(storage, parsed, parsed.data, '导入');
+}
+
+module.exports = { KEY, LEGACY_BACKUP, LEGACY_LATEST_BACKUP, RESET_BACKUP, RESET_LATEST_BACKUP, RESTORE_BACKUP, BACKUP_SLOTS, EXPORT_APP,
+  EXPORT_FORMAT, IMPORT_MAX_LENGTH, clone, createState, validateState, migrateLegacy, load, save, reset, listBackups, restore,
+  buildExport, previewImport, importText };

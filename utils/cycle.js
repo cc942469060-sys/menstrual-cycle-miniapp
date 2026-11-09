@@ -2,6 +2,12 @@ const DAY_MS = 86400000;
 const CYCLE_MIN = 10;
 const CYCLE_MAX = 180;
 const PERIOD_MAX = 180;
+// Statistics and the prediction model share the same recent sample window.
+const MODEL_WINDOW = 12;
+// Estimated fertile windows are only projected this many cycles ahead.
+const FERTILE_CYCLES = 2;
+// An unfinished event lasting longer than this asks the user to confirm its end.
+const ONGOING_PROMPT_DAYS = 10;
 
 // Date-only values use UTC components; device time zones only determine today.
 function parseDate(value) {
@@ -62,9 +68,23 @@ function extractPeriods(markedDates) {
 
 function mean(values) { return values.length ? Math.round(values.reduce((sum, n) => sum + n, 0) / values.length) : null; }
 
+function median(values) {
+  if (!values.length) return null;
+  const sorted = values.slice().sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[middle] : Math.round((sorted[middle - 1] + sorted[middle]) / 2);
+}
+
+// An unfinished event covers its start through today, never into the future.
+function effectiveEnd(period, today) {
+  if (period.end) return period.end;
+  return period.status === 'ongoing' && today > period.start ? today : period.start;
+}
+
 function calculateStats(periods) {
   if (!Array.isArray(periods)) throw new Error('经期记录必须是数组');
-  const sorted = periods.filter(p => p.status !== 'needsReview').slice().sort((a, b) => a.start.localeCompare(b.start));
+  const all = periods.slice().sort((a, b) => a.start.localeCompare(b.start));
+  const sorted = all.filter(p => p.status !== 'needsReview');
   const periodLengths = [];
   sorted.forEach(p => {
     parseDate(p.start);
@@ -77,20 +97,30 @@ function calculateStats(periods) {
   const recordedIntervals = [];
   const cycleLengths = [];
   const excludedIntervals = [];
+  let lastIntervalExclusion = '';
   for (let i = 1; i < sorted.length; i++) {
-    const length = daysBetween(sorted[i - 1].start, sorted[i].start);
+    const previous = sorted[i - 1];
+    const current = sorted[i];
+    const length = daysBetween(previous.start, current.start);
     if (length <= 0) throw new Error('经期开始日期不能重复');
     recordedIntervals.push(length);
-    if (sorted[i].excludeGap) excludedIntervals.push({ start: sorted[i - 1].start, end: sorted[i].start, length, reason: '用户标记漏录' });
+    // An unreviewed start inside the interval leaves its true cycle boundaries unknown.
+    const spansReview = all.some(p => p.status === 'needsReview' && p.start > previous.start && p.start < current.start);
+    const reason = current.excludeGap ? 'gap' : (spansReview ? 'review' : '');
+    if (reason) excludedIntervals.push({ start: previous.start, end: current.start, length, reason });
     else cycleLengths.push(length);
+    lastIntervalExclusion = reason;
   }
+  const cycleSamples = cycleLengths.slice(-MODEL_WINDOW);
+  // The median keeps a single unusually long bleed from stretching every later prediction.
+  const periodSamples = periodLengths.slice(-MODEL_WINDOW);
   const last = sorted[sorted.length - 1];
   return {
-    avgCycleLength: mean(cycleLengths), avgPeriodLength: mean(periodLengths),
-    avgRecordedInterval: mean(recordedIntervals), cycleLengths, recordedIntervals, excludedIntervals,
-    cycleSampleCount: cycleLengths.length, periodSampleCount: periodLengths.length,
-    minCycleLength: cycleLengths.length ? Math.min(...cycleLengths) : null,
-    maxCycleLength: cycleLengths.length ? Math.max(...cycleLengths) : null,
+    avgCycleLength: mean(cycleSamples), typicalPeriodLength: median(periodSamples),
+    avgRecordedInterval: mean(recordedIntervals), cycleLengths, cycleSamples, recordedIntervals, excludedIntervals, lastIntervalExclusion,
+    cycleSampleCount: cycleSamples.length, periodSampleCount: periodSamples.length,
+    minCycleLength: cycleSamples.length ? Math.min(...cycleSamples) : null,
+    maxCycleLength: cycleSamples.length ? Math.max(...cycleSamples) : null,
     lastPeriodStart: last ? last.start : '', lastPeriodEnd: last ? (last.end || '') : '',
     periodCount: sorted.length, reviewCount: periods.length - sorted.length,
   };
@@ -126,21 +156,24 @@ function computePredictions(state, today) {
   const stats = calculateStats(state.periods.filter(p => !futureRecords.includes(p)));
   stats.reviewCount += futureRecords.length;
   const prefs = state.preferences;
-  const samples = stats.cycleLengths.slice(-12);
+  const samples = stats.cycleSamples;
   const min = samples.length ? Math.min(...samples) : prefs.initialCycleLength;
   const max = samples.length ? Math.max(...samples) : prefs.initialCycleLength;
   const spread = max - min;
   const manual = prefs.predictionMode === 'manual';
-  const cycleLength = manual ? prefs.manualCycleLength : (mean(samples) || prefs.initialCycleLength);
-  const periodLength = manual ? prefs.manualPeriodLength : (stats.avgPeriodLength || prefs.initialPeriodLength);
-  const hasOngoing = state.periods.some(p => p.status === 'ongoing');
-  const recentGapExcluded = state.periods.filter(p => p.status !== 'needsReview').sort((a, b) => a.start.localeCompare(b.start)).slice(-1).some(p => p.excludeGap);
+  const cycleLength = manual ? prefs.manualCycleLength : (stats.avgCycleLength || prefs.initialCycleLength);
+  const periodLength = manual ? prefs.manualPeriodLength : (stats.typicalPeriodLength || prefs.initialPeriodLength);
+  const ongoing = state.periods.find(p => p.status === 'ongoing');
+  const recentExclusion = stats.lastIntervalExclusion;
   // Model gates are product heuristics, not diagnostic definitions of regularity.
-  let quality = samples.length >= 3 && spread <= 7 && min >= 18 && max <= 45 && !recentGapExcluded ? 'regular' : 'limited';
-  let message = quality === 'regular' ? '按最近记录估计，远期日期的不确定性会增大。' : '样本不足或超出模型适用范围，日期仅作粗略参考，不推算易孕期。';
+  let quality = 'limited';
+  let message = '样本不足或超出模型适用范围，日期仅作粗略参考，不推算易孕期。';
   if (spread > 7) { quality = 'irregular'; message = '记录间隔波动较大，请核对漏录；仅显示可能日期范围，不推算易孕期。'; }
-  if (manual && (cycleLength < min || cycleLength > max)) { quality = 'limited'; message = '使用手动参数，与已记录间隔不同；不推算易孕期。'; }
-  if (recentGapExcluded) message = '最近间隔已标记漏录；使用其他记录作粗略参考，不推算易孕期。';
+  else if (samples.length >= 3 && min >= 18 && max <= 45 && !recentExclusion) { quality = 'regular'; message = '按最近记录估计，远期日期的不确定性会增大。'; }
+  if (manual && !samples.length) { quality = 'limited'; message = '使用手动参数，尚无可比较的记录间隔；日期仅作粗略参考，不推算易孕期。'; }
+  else if (manual && (cycleLength < min || cycleLength > max)) { quality = 'limited'; message = '使用手动参数，与已记录间隔不同；不推算易孕期。'; }
+  if (recentExclusion === 'gap') message = '最近间隔已标记漏录；使用其他记录作粗略参考，不推算易孕期。';
+  if (recentExclusion === 'review') message = '最近间隔中有待核对的旧记录；使用其他记录作粗略参考，不推算易孕期。';
   if (!Number.isInteger(cycleLength) || cycleLength < CYCLE_MIN || cycleLength > CYCLE_MAX || !Number.isInteger(periodLength) || periodLength < 1 || periodLength >= cycleLength) {
     quality = 'unavailable'; message = '当前经期长度或间隔不适合固定周期模型，真实记录已保留。';
   }
@@ -150,10 +183,21 @@ function computePredictions(state, today) {
     quality, predictionMessage: message, nextPeriodStart: '', nextPeriodEnd: '', predictionStatus: 'empty',
     predictionStatusText: '尚无确认的开始记录', overdueDays: 0, expectedWindowStart: '', expectedWindowEnd: '',
     predictedDates: [], upcomingPeriods: [], ovulationDates: [], fertileDates: [], ovulationWindow: '', fertileWindow: '',
+    ongoingId: '', ongoingStart: '', ongoingDay: 0, ongoingLong: false,
   };
   if (futureRecords.length) return { ...result, quality: 'unavailable', predictionStatus: 'review', predictionStatusText: '请核对既有记录日期', predictionMessage: '既有记录晚于当前所在地的今天。原日期已保留，请核对设备日期或编辑记录，暂不预测。' };
   if (!stats.lastPeriodStart) return result;
-  if (hasOngoing) return { ...result, predictionStatus: 'ongoing', predictionStatusText: '本次经期进行中', predictionMessage: '结束日期尚未确认，确认结束后再推算下一次。' };
+  if (ongoing) {
+    const day = daysBetween(ongoing.start, today) + 1;
+    const long = day > ONGOING_PROMPT_DAYS;
+    return { ...result, ongoingId: ongoing.id, ongoingStart: ongoing.start, ongoingDay: day, ongoingLong: long,
+      predictionStatus: 'ongoing', predictionStatusText: `经期第 ${day} 天（进行中）`,
+      predictionMessage: long ? `已持续 ${day} 天。如果已经结束，请选择实际结束日；确认结束后再推算下一次。` : '结束日期尚未确认，确认结束后再推算下一次。' };
+  }
+  // A newer unreviewed legacy start would make the latest confirmed start misleading.
+  if (state.periods.some(p => p.status === 'needsReview' && p.start > stats.lastPeriodStart)) {
+    return { ...result, quality: 'unavailable', predictionStatus: 'review', predictionStatusText: '请先核对较新的旧记录', predictionMessage: '最近确认的开始日之后还有待核对的旧记录，核对实际日期后再推算。' };
+  }
   if (quality === 'unavailable') return { ...result, predictionStatus: 'unavailable', predictionStatusText: '暂不提供固定日期预测' };
   const rangeMin = manual ? cycleLength : min;
   const rangeMax = manual ? cycleLength : max;
@@ -174,29 +218,34 @@ function computePredictions(state, today) {
   const ovu = new Set();
   const fertile = new Set();
   const covered = date => state.periods.some(p => p.status === 'completed' && date >= p.start && date <= p.end);
+  const addRange = (set, first, last) => {
+    for (let n = 0, length = daysBetween(first, last); n <= length; n++) {
+      const date = addDays(first, n);
+      if (date <= endLimit && !covered(date)) set.add(date);
+    }
+  };
+  const showWindows = quality === 'regular' && result.predictionStatus !== 'overdue';
   const maxIterations = Math.ceil(365 / cycleLength) + 2;
   // Retain the first expected date; never silently advance over missing records.
   for (let i = 1; i <= maxIterations; i++) {
     const start = addDays(stats.lastPeriodStart, i * cycleLength);
     if (start > endLimit || (i > 1 && (quality !== 'regular' || result.predictionStatus === 'overdue'))) break;
     const end = addDays(start, periodLength - 1);
-    for (let day = 0; day < periodLength; day++) {
-      const date = addDays(start, day);
-      if (date <= endLimit && !covered(date)) predicted.add(date);
-    }
+    addRange(predicted, start, end);
     const entry = { start, end, ovulationStart: '', ovulationEnd: '', fertileStart: '', fertileEnd: '' };
-    if (quality === 'regular' && result.predictionStatus !== 'overdue') {
-      const window = getFertileWindow(addDays(stats.lastPeriodStart, i * rangeMin), addDays(stats.lastPeriodStart, i * rangeMax));
+    // The observed range widens with the square root of the cycles ahead (exactly min–max for
+    // the next cycle). Further out, windows would merge with each other and with predicted
+    // periods, so they are not projected at all.
+    if (showWindows && i <= FERTILE_CYCLES) {
+      const scale = Math.sqrt(i);
+      const earliest = i * cycleLength - Math.ceil((cycleLength - rangeMin) * scale);
+      const latest = i * cycleLength + Math.ceil((rangeMax - cycleLength) * scale);
+      const window = getFertileWindow(addDays(stats.lastPeriodStart, earliest), addDays(stats.lastPeriodStart, latest));
       Object.assign(entry, window);
-      for (let n = 0, length = daysBetween(window.ovulationStart, window.ovulationEnd); n <= length; n++) {
-        const date = addDays(window.ovulationStart, n);
-        if (date <= endLimit && !covered(date)) ovu.add(date);
-      }
-      for (let n = 0, length = daysBetween(window.fertileStart, window.fertileEnd); n <= length; n++) {
-        const date = addDays(window.fertileStart, n);
-        if (date <= endLimit && !covered(date)) fertile.add(date);
-      }
-      if (i === 1) {
+      addRange(ovu, window.ovulationStart, window.ovulationEnd);
+      addRange(fertile, window.fertileStart, window.fertileEnd);
+      // The summary names the first window that has not ended yet.
+      if (!result.fertileWindow && window.fertileEnd >= today) {
         result.ovulationWindow = `${window.ovulationStart} ~ ${window.ovulationEnd}`;
         result.fertileWindow = `${window.fertileStart} ~ ${window.fertileEnd}`;
       }
@@ -219,16 +268,18 @@ function generateCalendarGrid(year, month, periods, predictions, draft, today) {
   return Array.from({ length: 42 }, (_, index) => {
     const date = addDays(start, index);
     const parsed = parseDate(date);
-    const hit = periods.find(p => date >= p.start && date <= (p.end || p.start));
+    const hit = periods.find(p => date >= p.start && date <= effectiveEnd(p, today));
     const unreviewed = hit && (hit.status === 'needsReview' || hit.start > today || (hit.end && hit.end > today));
     const confirmed = hit && !unreviewed;
+    const isPredicted = !hit && predicted.has(date);
     return {
       date, day: parsed.getUTCDate(), isCurrentMonth: parsed.getUTCMonth() + 1 === month && parsed.getUTCFullYear() === year,
       isToday: date === today, isFuture: date > today, isWeekend: [0, 6].includes(parsed.getUTCDay()),
       periodId: hit ? hit.id : '', isMarked: !!confirmed, isUnreviewed: !!unreviewed,
       isPeriodStart: !!confirmed && date === hit.start, isPeriodEnd: !!confirmed && date === hit.end,
-      isPending: !!draft && date === draft.start, isPredicted: !hit && predicted.has(date),
-      isOvulation: !hit && ovulation.has(date), isFertile: !hit && fertile.has(date),
+      isPending: !!draft && date === draft.start, isPredicted,
+      // Actual records take precedence over predicted periods, which take precedence over estimated windows.
+      isOvulation: !hit && !isPredicted && ovulation.has(date), isFertile: !hit && !isPredicted && fertile.has(date),
     };
   });
 }
@@ -237,6 +288,21 @@ function getPeriodBoundaries(periods) {
   return { startSet: new Set(periods.map(p => p.start)), endSet: new Set(periods.filter(p => p.end).map(p => p.end)) };
 }
 
-module.exports = { DAY_MS, CYCLE_MIN, CYCLE_MAX, PERIOD_MAX, parseDate, formatDate, formatUTC, isDate, dateNumber, daysBetween, addDays,
-  getDaysInMonth, getFirstDayOfWeek, extractPeriods, calculateStats, predictNextPeriod, predictWithMovingAverage, getOvulationDay,
-  getFertileWindow, computePredictions, generateCalendarGrid, getPeriodBoundaries };
+// Returns the gap-flagged interval that a newly placed confirmed event splits, if any.
+function findSplitGap(previousPeriods, nextPeriods, id) {
+  const confirmed = list => list.filter(p => p.status !== 'needsReview').sort((a, b) => a.start.localeCompare(b.start));
+  const after = confirmed(nextPeriods);
+  const index = after.findIndex(p => p.id === id);
+  if (index < 1 || index > after.length - 2 || !after[index + 1].excludeGap) return null;
+  const following = after[index + 1];
+  const before = confirmed(previousPeriods);
+  const followingIndex = before.findIndex(p => p.id === following.id);
+  // The flag already described this exact interval if the event was the predecessor before.
+  if (followingIndex > 0 && before[followingIndex - 1].id === id) return null;
+  return { previous: after[index - 1], record: after[index], following };
+}
+
+module.exports = { DAY_MS, CYCLE_MIN, CYCLE_MAX, PERIOD_MAX, MODEL_WINDOW, FERTILE_CYCLES, ONGOING_PROMPT_DAYS, parseDate, formatDate, formatUTC,
+  isDate, dateNumber, daysBetween, addDays, getDaysInMonth, getFirstDayOfWeek, extractPeriods, median, effectiveEnd, calculateStats,
+  predictNextPeriod, predictWithMovingAverage, getOvulationDay, getFertileWindow, computePredictions, generateCalendarGrid,
+  getPeriodBoundaries, findSplitGap };

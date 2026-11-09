@@ -27,6 +27,7 @@
       <view class="setup-footer">
         <view class="setup-btn setup-btn-primary" bindtap="confirmSetup">开始使用</view>
         <view class="setup-btn setup-btn-ghost" bindtap="skipSetup">使用默认参考</view>
+        <view class="setup-btn setup-btn-ghost" bindtap="importBackup">已有备份？从备份导入</view>
       </view>
     </view>
   </view>
@@ -48,7 +49,7 @@
   </view>
 
   <view class="header"><view class="header-title">经期助手</view><view class="header-subtitle">记录 · 估计 · 关爱自己</view></view>
-  <view class="notice-card error-card" wx:if="{{loadError}}"><view>{{loadError}}</view><button class="secondary-action" bindtap="retryLoad">重试读取</button><button class="delete-action" bindtap="resetAll">备份后重置</button></view>
+  <view class="notice-card error-card" wx:if="{{loadError}}"><view>{{loadError}}</view><button class="secondary-action" bindtap="retryLoad">重试读取</button><button class="secondary-action" bindtap="restoreFromBackup">从备份恢复</button><button class="delete-action" bindtap="resetAll">备份后重置</button></view>
   <view class="notice-card" wx:if="{{migrationMessage}}">{{migrationMessage}}</view>
   <view class="month-nav">
     <view class="nav-btn" bindtap="prevMonth"><text class="nav-arrow">‹</text></view>
@@ -59,6 +60,10 @@
   <view class="pending-tip" wx:if="{{pendingStart}}">
     开始日期：<text class="pending-date">{{pendingStart}}</text>。再点实际结束日，或保存为进行中记录。
     <view class="draft-actions"><button class="secondary-action" bindtap="markOngoing">保存为进行中</button><button class="secondary-action" bindtap="cancelDraft">取消录入</button></view>
+  </view>
+  <view class="pending-tip" wx:if="{{ongoingStart}}">
+    本次经期 <text class="pending-date">{{ongoingStart}}</text> 开始，今天是第 {{ongoingDay}} 天。{{ongoingLong ? '持续时间较长，如果已经结束，请确认结束日。' : '结束后点日历上的结束日即可。'}}
+    <view class="draft-actions"><button class="secondary-action" bindtap="endOngoingToday">今天结束</button><button class="secondary-action" bindtap="editOngoing">选择结束日</button></view>
   </view>
   <view class="weekday-row"><view class="weekday-cell" wx:for="{{weekdays}}" wx:key="*this"><text class="{{index === 0 || index === 6 ? 'text-weekend' : ''}}">{{item}}</text></view></view>
   <view class="calendar-grid">
@@ -83,8 +88,8 @@
   <view class="section-card stats-card">
     <view class="card-header"><text class="card-title">实际记录统计</text><text class="card-sub">确认 {{periodCount}} 次 · 待核对 {{reviewCount}} 次</text></view>
     <view class="stats-grid">
-      <view class="stat-item"><view class="stat-value">{{avgCycleLength === null ? '--' : avgCycleLength}}<text class="stat-unit"> 天</text></view><view class="stat-label">平均开始日间隔 · {{cycleSampleCount}} 个样本</view></view>
-      <view class="stat-item"><view class="stat-value">{{avgPeriodLength === null ? '--' : avgPeriodLength}}<text class="stat-unit"> 天</text></view><view class="stat-label">平均已结束经期 · {{periodSampleCount}} 个样本</view></view>
+      <view class="stat-item"><view class="stat-value">{{avgCycleLength === null ? '--' : avgCycleLength}}<text class="stat-unit"> 天</text></view><view class="stat-label">平均开始日间隔 · 最近 {{cycleSampleCount}} 个</view></view>
+      <view class="stat-item"><view class="stat-value">{{typicalPeriodLength === null ? '--' : typicalPeriodLength}}<text class="stat-unit"> 天</text></view><view class="stat-label">经期天数中位数 · 最近 {{periodSampleCount}} 次</view></view>
       <view class="stat-item"><view class="stat-value">{{lastPeriodStart || '--'}}</view><view class="stat-label">最近确认开始日</view></view>
       <view class="stat-item"><view class="stat-value highlight">{{nextPeriodStart || '--'}}</view><view class="stat-label">当前预计开始日</view></view>
     </view>
@@ -108,10 +113,15 @@
   </view>
   <view class="section-card settings-card">
     <view class="card-header"><text class="card-title">预测设置</text><text class="card-sub">{{predictionMode === 'auto' ? '自动估计' : '手动参数'}}</text></view>
-    <view class="model-note">调整下方天数将切换到手动模式，只影响预计日期，不修改历史。</view>
+    <view class="model-note">下方显示当前预测实际使用的天数。调整后切换到手动模式，只影响预计日期，不修改历史。</view>
     <view class="settings-row"><view class="setting-label"><text class="setting-name">周期参考</text><text class="setting-hint">两次开始日间隔</text></view><view class="setting-stepper"><view class="stepper-btn" bindtap="changeCycleLength" data-delta="{{-1}}">−</view><text class="stepper-value">{{settingCycleLength}} 天</text><view class="stepper-btn" bindtap="changeCycleLength" data-delta="{{1}}">+</view></view></view>
     <view class="settings-row"><view class="setting-label"><text class="setting-name">经期参考</text><text class="setting-hint">用于预测，须小于周期参考</text></view><view class="setting-stepper"><view class="stepper-btn" bindtap="changePeriodLength" data-delta="{{-1}}">−</view><text class="stepper-value">{{settingPeriodLength}} 天</text><view class="stepper-btn" bindtap="changePeriodLength" data-delta="{{1}}">+</view></view></view>
     <button class="secondary-action" wx:if="{{predictionMode === 'manual'}}" bindtap="restoreAutoMode">恢复自动预测（保留记录）</button>
+  </view>
+  <view class="section-card">
+    <view class="card-header"><text class="card-title">数据备份</text></view>
+    <view class="model-note">记录只保存在这台手机的微信里，删除小程序、系统清理存储或换手机都会丢失。请定期导出备份，并只发给自己（例如“文件传输助手”）。导入会替换当前记录，替换前会自动另存一份。</view>
+    <view class="draft-actions"><button class="secondary-action" bindtap="exportToChat">发送备份文件</button><button class="secondary-action" bindtap="copyBackupText">复制备份文本</button><button class="secondary-action" bindtap="importBackup">导入备份</button><button class="secondary-action" bindtap="restoreFromBackup">从本机备份恢复</button></view>
   </view>
   <view class="footer"><button class="reset-btn" bindtap="resetAll">备份并重置所有数据</button><view class="footer-text">记录仅保存在本地，不会上传</view></view>
 </view>
