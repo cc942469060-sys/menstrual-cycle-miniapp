@@ -5,6 +5,9 @@ const RESET_BACKUP = 'cycle_data_backup_before_reset';
 const LEGACY_LATEST_BACKUP = 'cycle_data_backup_v1_latest';
 const RESET_LATEST_BACKUP = 'cycle_data_backup_before_reset_latest';
 const RESTORE_BACKUP = 'cycle_data_backup_before_restore';
+// Damaged data set aside by a repair; it fails validation, so it is kept for manual recovery only.
+const REPAIR_BACKUP = 'cycle_data_backup_before_repair';
+const REPAIR_LATEST_BACKUP = 'cycle_data_backup_before_repair_latest';
 // Offered most recent first; labels are shown when the user chooses a backup.
 const BACKUP_SLOTS = [
   { key: RESET_LATEST_BACKUP, label: '最近一次重置前' },
@@ -22,11 +25,22 @@ const clone = value => JSON.parse(JSON.stringify(value));
 
 function createState() {
   return { schemaVersion: 2, periods: [], draft: null, setupCompleted: false,
-    preferences: { predictionMode: 'auto', initialCycleLength: 28, initialPeriodLength: 5, manualCycleLength: null, manualPeriodLength: null } };
+    preferences: { predictionMode: 'auto', initialCycleLength: 28, initialPeriodLength: 5, manualCycleLength: null, manualPeriodLength: null, weekStartsOn: 0 } };
 }
 
 function integer(value, min, max, label) {
   if (!Number.isInteger(value) || value < min || value > max) throw new Error(`${label}无效`);
+}
+
+// Checks one event on its own; uniqueness and overlaps are checked across events by validateState.
+function validateRecord(p, today, allowHistoricalFuture) {
+  if (!p || typeof p.id !== 'string' || !p.id || p.id.length > 128) throw new Error('记录编号异常');
+  if (!['completed', 'ongoing', 'needsReview'].includes(p.status) || !['user', 'legacy'].includes(p.source) || typeof p.excludeGap !== 'boolean') throw new Error('记录状态异常');
+  C.parseDate(p.start);
+  if (p.end !== null) { C.parseDate(p.end); if (p.end < p.start) throw new Error('结束日期不能早于开始日期'); }
+  if (p.status === 'completed' && p.end === null) throw new Error('请确认结束日期');
+  if (p.status === 'ongoing' && p.end !== null) throw new Error('进行中记录不能有结束日期');
+  if (!allowHistoricalFuture && p.status !== 'needsReview' && (p.start > today || (p.end && p.end > today))) throw new Error('未来日期不能保存为实际记录');
 }
 
 function validateState(input, today, allowHistoricalFuture = false) {
@@ -46,17 +60,15 @@ function validateState(input, today, allowHistoricalFuture = false) {
     integer(prefs.manualPeriodLength, 1, C.PERIOD_MAX, '手动经期');
     if (prefs.manualPeriodLength >= prefs.manualCycleLength) throw new Error('预测经期天数必须小于周期天数');
   }
+  // Data saved before the week-start option existed starts weeks on Sunday.
+  if (prefs.weekStartsOn === undefined) prefs.weekStartsOn = 0;
+  else if (prefs.weekStartsOn !== 0 && prefs.weekStartsOn !== 1) throw new Error('显示设置异常');
   const ids = new Set();
   let ongoingCount = 0;
   state.periods.forEach(p => {
-    if (!p || typeof p.id !== 'string' || !p.id || p.id.length > 128 || ids.has(p.id)) throw new Error('记录编号异常');
+    validateRecord(p, today, allowHistoricalFuture);
+    if (ids.has(p.id)) throw new Error('记录编号异常');
     ids.add(p.id);
-    if (!['completed', 'ongoing', 'needsReview'].includes(p.status) || !['user', 'legacy'].includes(p.source) || typeof p.excludeGap !== 'boolean') throw new Error('记录状态异常');
-    C.parseDate(p.start);
-    if (p.end !== null) { C.parseDate(p.end); if (p.end < p.start) throw new Error('结束日期不能早于开始日期'); }
-    if (p.status === 'completed' && p.end === null) throw new Error('请确认结束日期');
-    if (p.status === 'ongoing' && p.end !== null) throw new Error('进行中记录不能有结束日期');
-    if (!allowHistoricalFuture && p.status !== 'needsReview' && (p.start > today || (p.end && p.end > today))) throw new Error('未来日期不能保存为实际记录');
     if (p.status === 'ongoing') ongoingCount++;
   });
   if (ongoingCount > 1) throw new Error('请先结束已有的进行中记录');
@@ -105,8 +117,9 @@ function backup(storage, firstKey, latestKey, raw) {
 }
 
 function load(storage, today) {
+  let raw;
   try {
-    const raw = storage.getStorageSync(KEY);
+    raw = storage.getStorageSync(KEY);
     if (isMissing(raw)) return { ok: true, state: createState(), warnings: [] };
     // Travel or a clock change must not invalidate or rewrite previously saved dates.
     if (raw.schemaVersion === 2) return { ok: true, state: validateState(raw, today, true), warnings: [] };
@@ -115,7 +128,57 @@ function load(storage, today) {
     backup(storage, LEGACY_BACKUP, LEGACY_LATEST_BACKUP, raw);
     storage.setStorageSync(KEY, migration.state);
     return { ok: true, ...migration, migrated: true };
-  } catch (error) { return { ok: false, message: '记录未能安全读取，原数据未改动。请重试。', detail: error.message }; }
+  } catch (error) {
+    const result = { ok: false, message: '记录未能安全读取，原数据未改动。请重试。', detail: error.message };
+    const plan = planRepair(raw, today);
+    if (plan) result.repair = { removedCount: plan.removedCount, resetPreferences: plan.resetPreferences, droppedDraft: plan.droppedDraft };
+    return result;
+  }
+}
+
+// Plans how stored data that fails validation could keep being used: events that are invalid on
+// their own are set aside, while invalid settings and drafts (not facts) fall back to defaults.
+// Problems between events, such as overlaps or two unfinished events, are ambiguous: no plan.
+function planRepair(raw, today) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw) || raw.schemaVersion !== 2 || !Array.isArray(raw.periods)) return null;
+  try {
+    const state = createState();
+    state.setupCompleted = raw.setupCompleted === true;
+    let resetPreferences = false;
+    try { state.preferences = validateState({ ...createState(), preferences: raw.preferences }, today, true).preferences; }
+    catch (error) { resetPreferences = true; }
+    const ids = new Set();
+    let removedCount = 0;
+    raw.periods.forEach(period => {
+      try {
+        validateRecord(period, today, true);
+        if (ids.has(period.id)) throw new Error('记录编号重复');
+        ids.add(period.id);
+        state.periods.push(clone(period));
+      } catch (error) { removedCount++; }
+    });
+    let droppedDraft = false;
+    if (raw.draft !== null && raw.draft !== undefined) {
+      try { state.draft = validateState({ ...createState(), draft: raw.draft }, today, true).draft; }
+      catch (error) { droppedDraft = true; }
+    }
+    return { state: validateState(state, today, true), removedCount, resetPreferences, droppedDraft };
+  } catch (error) { return null; }
+}
+
+// Applies planRepair after keeping the damaged original, which stays in storage for manual recovery.
+function repair(storage, today) {
+  let raw;
+  let plan;
+  try { raw = storage.getStorageSync(KEY); plan = planRepair(raw, today); }
+  catch (error) { return { ok: false, message: '记录未能读取，已停止修复。' }; }
+  if (!plan) return { ok: false, message: '这份数据无法自动修复，原数据未改动。' };
+  try { backup(storage, REPAIR_BACKUP, REPAIR_LATEST_BACKUP, raw); }
+  catch (error) { return { ok: false, message: '无法备份原数据，已停止修复。' }; }
+  try { storage.setStorageSync(KEY, clone(plan.state)); }
+  catch (error) { return { ok: false, message: '修复失败，原数据未改动，请重试。' }; }
+  const warnings = plan.removedCount ? [`已隔离 ${plan.removedCount} 条格式异常的记录，原数据已完整备份。`] : ['已修正格式问题，原数据已完整备份。'];
+  return { ok: true, state: plan.state, warnings };
 }
 
 function save(storage, candidate, today, previous = null) {
@@ -229,6 +292,6 @@ function importText(storage, text, today) {
   return replaceCurrent(storage, parsed, parsed.data, '导入');
 }
 
-module.exports = { KEY, LEGACY_BACKUP, LEGACY_LATEST_BACKUP, RESET_BACKUP, RESET_LATEST_BACKUP, RESTORE_BACKUP, BACKUP_SLOTS, EXPORT_APP,
-  EXPORT_FORMAT, IMPORT_MAX_LENGTH, clone, createState, validateState, migrateLegacy, load, save, reset, listBackups, restore,
-  buildExport, previewImport, importText };
+module.exports = { KEY, LEGACY_BACKUP, LEGACY_LATEST_BACKUP, RESET_BACKUP, RESET_LATEST_BACKUP, RESTORE_BACKUP, REPAIR_BACKUP,
+  REPAIR_LATEST_BACKUP, BACKUP_SLOTS, EXPORT_APP, EXPORT_FORMAT, IMPORT_MAX_LENGTH, clone, createState, validateRecord, validateState,
+  migrateLegacy, load, save, reset, planRepair, repair, listBackups, restore, buildExport, previewImport, importText };
