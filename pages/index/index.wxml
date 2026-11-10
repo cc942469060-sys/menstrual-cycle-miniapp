@@ -1,3 +1,4 @@
+<page-meta page-style="{{showSetup || editorVisible ? 'overflow: hidden;' : ''}}" />
 <view class="container">
   <view class="setup-overlay" wx:if="{{showSetup}}" catchtap="stopTap">
     <view class="setup-modal" catchtap="stopTap">
@@ -9,19 +10,11 @@
       <view class="setup-body">
         <view class="setup-row">
           <view class="setup-label"><text class="setup-name">周期参考</text><text class="setup-hint">两次开始日间隔</text></view>
-          <view class="setup-stepper">
-            <view class="setup-stepper-btn" bindtap="onSetupCycleChange" data-delta="{{-1}}">−</view>
-            <text class="setup-stepper-value">{{setupCycleLength}} 天</text>
-            <view class="setup-stepper-btn" bindtap="onSetupCycleChange" data-delta="{{1}}">+</view>
-          </view>
+          <picker mode="selector" range="{{cycleOptions}}" value="{{setupCycleIndex}}" bindchange="onSetupCyclePick"><view class="picker-value">{{setupCycleLength}} 天 ▾</view></picker>
         </view>
         <view class="setup-row">
           <view class="setup-label"><text class="setup-name">经期参考</text><text class="setup-hint">仅用于估计，不会自动填入历史</text></view>
-          <view class="setup-stepper">
-            <view class="setup-stepper-btn" bindtap="onSetupPeriodChange" data-delta="{{-1}}">−</view>
-            <text class="setup-stepper-value">{{setupPeriodLength}} 天</text>
-            <view class="setup-stepper-btn" bindtap="onSetupPeriodChange" data-delta="{{1}}">+</view>
-          </view>
+          <picker mode="selector" range="{{periodOptions}}" value="{{setupPeriodIndex}}" bindchange="onSetupPeriodPick"><view class="picker-value">{{setupPeriodLength}} 天 ▾</view></picker>
         </view>
       </view>
       <view class="setup-footer">
@@ -48,8 +41,21 @@
     </view>
   </view>
 
-  <view class="header"><view class="header-title">经期助手</view><view class="header-subtitle">记录 · 估计 · 关爱自己</view></view>
-  <view class="notice-card error-card" wx:if="{{loadError}}"><view>{{loadError}}</view><button class="secondary-action" bindtap="retryLoad">重试读取</button><button class="secondary-action" bindtap="restoreFromBackup">从备份恢复</button><button class="delete-action" bindtap="resetAll">备份后重置</button></view>
+  <view class="notice-card error-card" wx:if="{{loadError}}">
+    <view>{{loadError}}</view>
+    <view class="error-hint" wx:if="{{repairText}}">{{repairText}}</view>
+    <view class="draft-actions">
+      <button class="secondary-action" bindtap="retryLoad">重试读取</button>
+      <button class="secondary-action" wx:if="{{repairText}}" bindtap="repairData">隔离异常记录</button>
+      <button class="secondary-action" bindtap="restoreFromBackup">从备份恢复</button>
+      <button class="delete-action" bindtap="resetAll">备份后重置</button>
+    </view>
+  </view>
+  <view class="status-card status-{{statusTone}}" wx:if="{{!loadError}}">
+    <view class="status-title">{{statusTitle}}</view>
+    <view class="status-detail">{{statusDetail}}</view>
+    <view class="draft-actions" wx:if="{{ongoingStart}}"><button class="secondary-action" bindtap="endOngoingToday">今天结束</button><button class="secondary-action" bindtap="editOngoing">选择结束日</button></view>
+  </view>
   <view class="notice-card" wx:if="{{migrationMessage}}">{{migrationMessage}}</view>
   <view class="month-nav">
     <view class="nav-btn" bindtap="prevMonth"><text class="nav-arrow">‹</text></view>
@@ -61,18 +67,14 @@
     开始日期：<text class="pending-date">{{pendingStart}}</text>。再点实际结束日，或保存为进行中记录。
     <view class="draft-actions"><button class="secondary-action" bindtap="markOngoing">保存为进行中</button><button class="secondary-action" bindtap="cancelDraft">取消录入</button></view>
   </view>
-  <view class="pending-tip" wx:if="{{ongoingStart}}">
-    本次经期 <text class="pending-date">{{ongoingStart}}</text> 开始，今天是第 {{ongoingDay}} 天。{{ongoingLong ? '持续时间较长，如果已经结束，请确认结束日。' : '结束后点日历上的结束日即可。'}}
-    <view class="draft-actions"><button class="secondary-action" bindtap="endOngoingToday">今天结束</button><button class="secondary-action" bindtap="editOngoing">选择结束日</button></view>
-  </view>
-  <view class="weekday-row"><view class="weekday-cell" wx:for="{{weekdays}}" wx:key="*this"><text class="{{index === 0 || index === 6 ? 'text-weekend' : ''}}">{{item}}</text></view></view>
+  <view class="weekday-row"><view class="weekday-cell" wx:for="{{weekdays}}" wx:key="label"><text class="{{item.weekend ? 'text-weekend' : ''}}">{{item.label}}</text></view></view>
   <view class="calendar-grid">
-    <view wx:for="{{calendarGrid}}" wx:key="date" class="day-cell {{!item.isCurrentMonth ? 'dimmed' : ''}} {{item.isToday ? 'today' : ''}} {{item.isMarked && !item.isPeriodStart && !item.isPeriodEnd ? 'period-mid' : ''}} {{item.isPeriodStart ? 'period-start' : ''}} {{item.isPeriodEnd ? 'period-end' : ''}} {{item.isPending ? 'pending' : ''}} {{item.isPredicted ? 'predicted' : ''}} {{item.isUnreviewed ? 'unreviewed' : ''}} {{item.isFertile && !item.isPredicted ? 'fertile' : ''}}" data-date="{{item.date}}" data-iscurrentmonth="{{item.isCurrentMonth}}" bindtap="onDayTap">
+    <view wx:for="{{calendarGrid}}" wx:key="date" class="{{item.cls}}" data-date="{{item.date}}" bindtap="onDayTap">
       <view class="day-num">{{item.day}}</view>
-      <view class="ovu-dot" wx:if="{{item.isOvulation}}"></view>
-      <view class="day-tag start-tag" wx:if="{{item.isPeriodStart}}">始</view>
-      <view class="day-tag end-tag" wx:if="{{item.isPeriodEnd}}">终</view>
-      <view class="review-tag" wx:if="{{item.isUnreviewed}}">核对</view>
+      <view class="ovu-dot" wx:if="{{item.ovulation}}"></view>
+      <view class="day-tag start-tag" wx:if="{{item.start}}">始</view>
+      <view class="day-tag end-tag" wx:if="{{item.end}}">终</view>
+      <view class="review-tag" wx:if="{{item.review}}">核对</view>
     </view>
   </view>
   <view class="section-card legend-card">
@@ -94,7 +96,6 @@
       <view class="stat-item"><view class="stat-value highlight">{{nextPeriodStart || '--'}}</view><view class="stat-label">当前预计开始日</view></view>
     </view>
     <view class="model-note">{{recordedIntervalText}}</view>
-    <view class="prediction-status">{{predictionStatusText}}</view>
     <view class="model-note" wx:if="{{expectedWindowStart}}">可能日期范围：{{expectedWindowStart}} ~ {{expectedWindowEnd}}</view>
     <view class="model-note">参考来源：{{modelSource}}。{{predictionMessage}}</view>
     <view class="model-note" wx:if="{{ovulationWindow}}">估计排卵窗口：{{ovulationWindow}}</view>
@@ -112,11 +113,21 @@
     <view class="model-note" wx:if="{{hasMoreRecords}}">仅列出最近 100 条；其他记录可在对应月份的日历中选择。</view>
   </view>
   <view class="section-card settings-card">
-    <view class="card-header"><text class="card-title">预测设置</text><text class="card-sub">{{predictionMode === 'auto' ? '自动估计' : '手动参数'}}</text></view>
-    <view class="model-note">下方显示当前预测实际使用的天数。调整后切换到手动模式，只影响预计日期，不修改历史。</view>
-    <view class="settings-row"><view class="setting-label"><text class="setting-name">周期参考</text><text class="setting-hint">两次开始日间隔</text></view><view class="setting-stepper"><view class="stepper-btn" bindtap="changeCycleLength" data-delta="{{-1}}">−</view><text class="stepper-value">{{settingCycleLength}} 天</text><view class="stepper-btn" bindtap="changeCycleLength" data-delta="{{1}}">+</view></view></view>
-    <view class="settings-row"><view class="setting-label"><text class="setting-name">经期参考</text><text class="setting-hint">用于预测，须小于周期参考</text></view><view class="setting-stepper"><view class="stepper-btn" bindtap="changePeriodLength" data-delta="{{-1}}">−</view><text class="stepper-value">{{settingPeriodLength}} 天</text><view class="stepper-btn" bindtap="changePeriodLength" data-delta="{{1}}">+</view></view></view>
+    <view class="card-header"><text class="card-title">设置</text><text class="card-sub">预测：{{predictionMode === 'auto' ? '自动估计' : '手动参数'}}</text></view>
+    <view class="model-note">下方显示当前预测实际使用的天数。选择后切换到手动模式，只影响预计日期，不修改历史。</view>
+    <view class="settings-row">
+      <view class="setting-label"><text class="setting-name">周期参考</text><text class="setting-hint">两次开始日间隔</text></view>
+      <picker mode="selector" range="{{cycleOptions}}" value="{{cycleIndex}}" bindchange="onCyclePick"><view class="picker-value">{{settingCycleLength}} 天 ▾</view></picker>
+    </view>
+    <view class="settings-row">
+      <view class="setting-label"><text class="setting-name">经期参考</text><text class="setting-hint">用于预测，须小于周期参考</text></view>
+      <picker mode="selector" range="{{periodOptions}}" value="{{periodIndex}}" bindchange="onPeriodPick"><view class="picker-value">{{settingPeriodLength}} 天 ▾</view></picker>
+    </view>
     <button class="secondary-action" wx:if="{{predictionMode === 'manual'}}" bindtap="restoreAutoMode">恢复自动预测（保留记录）</button>
+    <view class="settings-row">
+      <view class="setting-label"><text class="setting-name">每周从周一开始</text><text class="setting-hint">只影响日历的显示</text></view>
+      <switch checked="{{weekStartsOn === 1}}" bindchange="onWeekStartChange" color="#FF6B8A" />
+    </view>
   </view>
   <view class="section-card">
     <view class="card-header"><text class="card-title">数据备份</text></view>
@@ -125,4 +136,3 @@
   </view>
   <view class="footer"><button class="reset-btn" bindtap="resetAll">备份并重置所有数据</button><view class="footer-text">记录仅保存在本地，不会上传</view></view>
 </view>
-

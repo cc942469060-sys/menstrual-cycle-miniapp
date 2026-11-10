@@ -1,24 +1,24 @@
 const C = require('../../utils/cycle');
 const S = require('../../utils/store');
+const V = require('../../utils/view');
 
-// Manual adjustments start from the values the prediction currently uses, kept within valid bounds.
-function manualBase(model) {
-  const cycle = Math.max(C.CYCLE_MIN, Math.min(C.CYCLE_MAX, model.effectiveCycleLength));
-  return { cycle, period: Math.max(1, Math.min(C.PERIOD_MAX, cycle - 1, model.effectivePeriodLength)) };
+function setupPickerData(cycle, period) {
+  const indexes = V.pickerIndexes(cycle, period);
+  return { setupCycleLength: cycle, setupPeriodLength: period, setupCycleIndex: indexes.cycleIndex, setupPeriodIndex: indexes.periodIndex };
 }
 
 Page({
   data: {
-    year: 2026, month: 1, today: '', todayDateStr: '', calendarGrid: [],
-    weekdays: ['日', '一', '二', '三', '四', '五', '六'], showLegend: true,
-    loadError: '', migrationMessage: '', pendingStart: '', periodRows: [], hasMoreRecords: false,
+    year: 2026, month: 1, today: '', todayDateStr: '', calendarGrid: [], weekdays: V.weekdays(0), weekStartsOn: 0, showLegend: true,
+    loadError: '', repairText: '', migrationMessage: '', pendingStart: '', periodRows: [], hasMoreRecords: false,
+    statusTitle: '', statusDetail: '', statusTone: 'normal', ongoingStart: '',
     avgCycleLength: null, typicalPeriodLength: null, lastPeriodStart: '', periodCount: 0, reviewCount: 0,
-    ongoingStart: '', ongoingDay: 0, ongoingLong: false,
     cycleSampleCount: 0, periodSampleCount: 0, recordedIntervalText: '',
-    nextPeriodStart: '', expectedWindowStart: '', expectedWindowEnd: '', predictionStatusText: '',
+    nextPeriodStart: '', expectedWindowStart: '', expectedWindowEnd: '',
     predictionMessage: '', modelSource: '', upcomingPeriods: [], ovulationWindow: '', fertileWindow: '',
-    predictionMode: 'auto', settingCycleLength: 28, settingPeriodLength: 5,
-    showSetup: false, setupCycleLength: 28, setupPeriodLength: 5,
+    predictionMode: 'auto', settingCycleLength: 28, settingPeriodLength: 5, cycleIndex: 13, periodIndex: 4,
+    cycleOptions: V.CYCLE_OPTIONS, periodOptions: V.PERIOD_OPTIONS,
+    showSetup: false, ...setupPickerData(28, 5),
     editorVisible: false, editorId: '', editorStart: '', editorEnd: '', editorOngoing: false, editorExcludeGap: false,
   },
 
@@ -33,7 +33,8 @@ Page({
 
   onShow() {
     if (!this._loadReady) this.loadData();
-    else this.renderCalendar();
+    // Returning from a picker, a shared file, or the background only needs a refresh when the day changed.
+    else if (this.todayKey() !== this._todayKey) this.renderCalendar();
     this.startTodayWatcher();
   },
 
@@ -44,16 +45,16 @@ Page({
     const result = S.load(wx, C.formatDate(new Date()));
     if (!result.ok) {
       this._loadReady = false;
-      this.setData({ loadError: result.message, showSetup: false });
+      this.setData({ loadError: result.message, repairText: result.repair ? V.repairText(result.repair) : '', showSetup: false });
       this.renderCalendar();
       return false;
     }
     this._state = result.state;
     this._loadReady = true;
-    this.setData({ loadError: '', migrationMessage: result.warnings.join(' '),
+    const prefs = result.state.preferences;
+    this.setData({ loadError: '', repairText: '', migrationMessage: result.warnings.join(' '),
       showSetup: !result.state.setupCompleted && result.state.periods.length === 0,
-      setupCycleLength: result.state.preferences.initialCycleLength,
-      setupPeriodLength: result.state.preferences.initialPeriodLength });
+      ...setupPickerData(prefs.initialCycleLength, prefs.initialPeriodLength) });
     this.renderCalendar();
     return true;
   },
@@ -82,24 +83,20 @@ Page({
     const today = C.formatDate(new Date());
     const state = this._loadReady ? this._state : S.createState();
     const model = C.computePredictions(state, today);
-    const grid = C.generateCalendarGrid(this.data.year, this.data.month, state.periods, model, state.draft, today);
-    const rows = state.periods.slice().reverse().slice(0, 100).map(p => ({ ...p,
-      statusText: p.start > today || (p.end && p.end > today) ? '日期待核对' : (p.status === 'needsReview' ? '待核对' : (p.status === 'ongoing' ? '进行中' : '已确认')),
-      durationText: p.end ? `${C.daysBetween(p.start, p.end) + 1} 天`
-        : (p.status === 'ongoing' && p.start <= today ? `进行中 · 第 ${C.daysBetween(p.start, today) + 1} 天` : '结束日未确认'),
-    }));
-    const base = manualBase(model);
-    const gapCount = model.excludedIntervals.filter(item => item.reason === 'gap').length;
-    const spanCount = model.excludedIntervals.length - gapCount;
-    const excludedText = [gapCount ? `${gapCount} 个已标记漏录` : '', spanCount ? `${spanCount} 个跨越待核对记录` : ''].filter(Boolean).join('、');
-    const windowText = model.cycleLengths.length > C.MODEL_WINDOW ? `；平均只取最近 ${C.MODEL_WINDOW} 个` : '';
-    this.setData({
-      ...model, today, todayDateStr: today.slice(5), calendarGrid: grid,
-      periodRows: rows, hasMoreRecords: state.periods.length > 100, pendingStart: state.draft ? state.draft.start : '',
-      predictionMode: state.preferences.predictionMode, settingCycleLength: base.cycle, settingPeriodLength: base.period,
-      recordedIntervalText: `共 ${model.recordedIntervals.length} 个开始日间隔${excludedText ? `；${excludedText}，不参与周期平均` : ''}${windowText}。`,
-    });
-    this._todayKey = `${today}/${new Date().getTimezoneOffset()}`;
+    const grid = C.generateCalendarGrid(this.data.year, this.data.month, state.periods, model, state.draft, today, state.preferences.weekStartsOn || 0);
+    // The full model stays on the page for logic; only rendered fields that changed are sent.
+    this._model = model;
+    this._grid = grid;
+    const view = V.buildView(state, model, grid, today);
+    const patch = V.diffData(this._lastView, view);
+    this._lastView = view;
+    if (Object.keys(patch).length) this.setData(patch);
+    this._todayKey = this.todayKey();
+  },
+
+  todayKey() {
+    const now = new Date();
+    return `${C.formatDate(now)}/${now.getTimezoneOffset()}`;
   },
 
   startTodayWatcher() {
@@ -108,9 +105,7 @@ Page({
     const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
     const delay = Math.max(50, Math.min(30000, midnight.getTime() - now.getTime() + 50));
     this._todayTimer = setTimeout(() => {
-      const current = new Date();
-      const key = `${C.formatDate(current)}/${current.getTimezoneOffset()}`;
-      if (key !== this._todayKey) this.renderCalendar();
+      if (this.todayKey() !== this._todayKey) this.renderCalendar();
       this.startTodayWatcher();
     }, delay);
   },
@@ -142,13 +137,17 @@ Page({
 
   onDayTap(event) {
     if (!this.canWrite()) return;
-    const { date, iscurrentmonth } = event.currentTarget.dataset;
-    if (!iscurrentmonth || !C.isDate(date)) return;
+    const { date } = event.currentTarget.dataset;
+    if (!C.isDate(date)) return;
+    const [year, month] = date.split('-').map(Number);
+    // A greyed date from a neighbouring month switches to that month and still counts as the tap.
+    if (year !== this.data.year || month !== this.data.month) { this.setData({ year, month }); this.renderCalendar(); }
     const today = C.formatDate(new Date());
     const draft = this._state.draft;
     // A second click belongs to the draft, even if it hits an existing record.
     if (draft) {
       if (date > today) { this.notify('未来日期不能保存为实际记录'); return; }
+      if (date === draft.start) { this.askSameDay(date); return; }
       this.saveEvent({ id: '', start: draft.start < date ? draft.start : date,
         end: draft.start < date ? date : draft.start, ongoing: false, excludeGap: false, fromDraft: true });
       return;
@@ -160,6 +159,14 @@ Page({
     const next = S.clone(this._state);
     next.draft = { start: date, end: null };
     this.commit(next);
+  },
+
+  // Tapping the chosen start again usually means a one-day period, but it can also be an attempt to deselect.
+  askSameDay(date) {
+    wx.showActionSheet({ itemList: ['记录为 1 天经期', '取消选择这一天'], success: res => {
+      if (res.tapIndex === 0) this.saveEvent({ id: '', start: date, end: date, ongoing: false, excludeGap: false, fromDraft: true });
+      if (res.tapIndex === 1) this.cancelDraft();
+    } });
   },
 
   // A tap inside an unfinished event most often means it ended on that day.
@@ -297,7 +304,7 @@ Page({
       if (!result.ok) { this.notify(result.message); return; }
       this._state = result.state;
       this._loadReady = true;
-      this.setData({ loadError: '', migrationMessage: '', editorVisible: false, showSetup: true, setupCycleLength: 28, setupPeriodLength: 5 });
+      this.setData({ loadError: '', repairText: '', migrationMessage: '', editorVisible: false, showSetup: true, ...setupPickerData(28, 5) });
       this.renderCalendar();
       this.notify('已备份并重置');
     } });
@@ -323,10 +330,20 @@ Page({
   applyReplacedState(result, message) {
     this._state = result.state;
     this._loadReady = true;
-    this.setData({ loadError: '', migrationMessage: result.warnings.join(' '), editorVisible: false,
+    this.setData({ loadError: '', repairText: '', migrationMessage: result.warnings.join(' '), editorVisible: false,
       showSetup: !result.state.setupCompleted && result.state.periods.length === 0 });
     this.renderCalendar();
     this.notify(message);
+  },
+
+  // Offered only when the damage is limited to individual events, settings, or the draft.
+  repairData() {
+    wx.showModal({ title: '隔离异常记录', content: this.data.repairText, success: res => {
+      if (!res.confirm) return;
+      const result = S.repair(wx, C.formatDate(new Date()));
+      if (result.ok) this.applyReplacedState(result, '已修复，可以继续使用');
+      else this.notify(result.message);
+    } });
   },
 
   // wx.shareFileMessage only works while handling the tap itself, so everything before it is synchronous.
@@ -411,27 +428,41 @@ Page({
     this.commit(next, '已恢复自动预测，历史记录保留');
   },
 
-  changeCycleLength(event) { this.changeManualParameter('cycle', event.currentTarget.dataset.delta); },
-  changePeriodLength(event) { this.changeManualParameter('period', event.currentTarget.dataset.delta); },
-  changeManualParameter(field, deltaValue) {
+  onCyclePick(event) { this.setManualParameters(V.CYCLE_PICK_MIN + Number(event.detail.value), null); },
+  onPeriodPick(event) { this.setManualParameters(null, 1 + Number(event.detail.value)); },
+  // One picker choice is one write. A shorter cycle pulls the period below it; a too-long period is refused.
+  setManualParameters(cycleValue, periodValue) {
     if (!this.canWrite()) return;
-    const delta = Number(deltaValue);
-    if (delta !== 1 && delta !== -1) return;
+    const base = V.manualBase(C.computePredictions(this._state, C.formatDate(new Date())));
+    const cycle = cycleValue === null ? base.cycle : cycleValue;
+    let period = periodValue === null ? base.period : periodValue;
+    if (!Number.isInteger(cycle) || cycle < C.CYCLE_MIN || cycle > C.CYCLE_MAX || !Number.isInteger(period) || period < 1 || period > C.PERIOD_MAX) return;
+    if (period >= cycle) {
+      if (periodValue !== null) { this.notify('经期参考须小于周期参考'); return; }
+      period = cycle - 1;
+    }
     const next = S.clone(this._state);
-    let { cycle, period } = manualBase(C.computePredictions(this._state, C.formatDate(new Date())));
-    if (field === 'cycle') cycle = Math.max(C.CYCLE_MIN, Math.min(C.CYCLE_MAX, cycle + delta));
-    else period = Math.max(1, Math.min(C.PERIOD_MAX, period + delta));
     Object.assign(next.preferences, { predictionMode: 'manual', manualCycleLength: cycle, manualPeriodLength: period });
     this.commit(next);
   },
 
-  onSetupCycleChange(event) {
-    const delta = Number(event.currentTarget.dataset.delta);
-    if (delta === 1 || delta === -1) this.setData({ setupCycleLength: Math.max(C.CYCLE_MIN, Math.min(C.CYCLE_MAX, this.data.setupCycleLength + delta)) });
+  onWeekStartChange(event) {
+    if (!this.canWrite()) return;
+    const next = S.clone(this._state);
+    next.preferences.weekStartsOn = event.detail.value ? 1 : 0;
+    this.commit(next);
   },
-  onSetupPeriodChange(event) {
-    const delta = Number(event.currentTarget.dataset.delta);
-    if (delta === 1 || delta === -1) this.setData({ setupPeriodLength: Math.max(1, Math.min(C.PERIOD_MAX, this.data.setupPeriodLength + delta)) });
+
+  onSetupCyclePick(event) {
+    const cycle = V.CYCLE_PICK_MIN + Number(event.detail.value);
+    if (!Number.isInteger(cycle) || cycle < V.CYCLE_PICK_MIN || cycle > V.CYCLE_PICK_MAX) return;
+    this.setData(setupPickerData(cycle, Math.min(this.data.setupPeriodLength, cycle - 1)));
+  },
+  onSetupPeriodPick(event) {
+    const period = 1 + Number(event.detail.value);
+    if (!Number.isInteger(period) || period < 1 || period > V.PERIOD_PICK_MAX) return;
+    if (period >= this.data.setupCycleLength) { this.notify('经期参考须小于周期参考'); return; }
+    this.setData(setupPickerData(this.data.setupCycleLength, period));
   },
 
   confirmSetup() {

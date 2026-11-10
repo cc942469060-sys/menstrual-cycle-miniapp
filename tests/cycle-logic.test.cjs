@@ -5,8 +5,10 @@ const { C, S, copy, record, stateWith, storage, page } = require('./helpers.cjs'
 
 const starts = (first, intervals) => intervals.reduce((list, n) => [...list, C.addDays(list[list.length - 1], n)], [first]);
 const ongoingRecord = start => record(start, 1, { end: null, status: 'ongoing' });
-const excluded = e => e.p.data.excludedIntervals.map(item => `${item.start}->${item.end}`);
-const tapDelta = delta => ({ currentTarget: { dataset: { delta } } });
+const excluded = e => e.p._model.excludedIntervals.map(item => `${item.start}->${item.end}`);
+// Picker events carry the index of the chosen option as a string.
+const pickCycle = days => ({ detail: { value: String(days - 15) } });
+const pickPeriod = days => ({ detail: { value: String(days - 1) } });
 
 // ---- Ongoing events ----
 
@@ -16,13 +18,14 @@ test('an ongoing event is shown on the calendar from its start through today', (
   e.p.markOngoing();
   e.setNow('2026-10-04T09:00:00');
   e.p.renderCalendar();
-  const cells = e.p.data.calendarGrid.filter(c => c.date >= '2026-10-01' && c.date <= '2026-10-05');
+  const cells = e.p._grid.filter(c => c.date >= '2026-10-01' && c.date <= '2026-10-05');
   assert.deepEqual(cells.map(c => c.isMarked), [true, true, true, true, false]);
   assert.equal(cells[0].isPeriodStart, true);
   assert.equal(cells.some(c => c.isPeriodEnd), false);
   assert.equal(e.p.data.ongoingStart, '2026-10-01');
-  assert.equal(e.p.data.ongoingDay, 4);
-  assert.equal(e.p.data.predictionStatusText, '经期第 4 天（进行中）');
+  assert.equal(e.p._model.ongoingDay, 4);
+  assert.equal(e.p._model.predictionStatusText, '经期第 4 天（进行中）');
+  assert.equal(e.p.data.statusTitle, '经期第 4 天');
   assert.equal(e.p.data.periodRows[0].durationText, '进行中 · 第 4 天');
 });
 
@@ -119,22 +122,23 @@ test('the window summary names the first window that has not ended yet', () => {
 
 test('auto-mode settings show, and adjust from, the values predictions actually use', () => {
   const e = page(stateWith(starts('2026-05-01', [32, 32, 32, 32]).map(start => record(start))));
-  assert.equal(e.p.data.effectiveCycleLength, 32);
+  assert.equal(e.p._model.effectiveCycleLength, 32);
   assert.equal(e.p.data.settingCycleLength, 32);
   assert.equal(e.p.data.settingPeriodLength, 5);
   assert.equal(e.p.data.nextPeriodStart, '2026-10-08');
-  e.p.changeCycleLength(tapDelta(1));
+  assert.deepEqual([e.p.data.cycleIndex, e.p.data.periodIndex], [32 - 15, 5 - 1]);
+  e.p.onCyclePick(pickCycle(33));
   const prefs = e.p._state.preferences;
   assert.deepEqual([prefs.predictionMode, prefs.manualCycleLength, prefs.manualPeriodLength], ['manual', 33, 5]);
   assert.equal(e.p.data.nextPeriodStart, '2026-10-09');
 });
 
-test('manual adjustment still works when the observed period is not shorter than the cycle', () => {
+test('a model whose period is not shorter than the cycle can still be overridden manually', () => {
   const e = page(stateWith([record('2026-08-01', 30)]));
-  assert.equal(e.p.data.quality, 'unavailable');
+  assert.equal(e.p._model.quality, 'unavailable');
   assert.equal(e.p.data.settingPeriodLength, 27);
-  e.p.changePeriodLength(tapDelta(-1));
-  assert.deepEqual([e.p._state.preferences.manualCycleLength, e.p._state.preferences.manualPeriodLength], [28, 26]);
+  e.p.onPeriodPick(pickPeriod(10));
+  assert.deepEqual([e.p._state.preferences.manualCycleLength, e.p._state.preferences.manualPeriodLength], [28, 10]);
 });
 
 test('manual mode without any recorded interval does not claim to differ from records', () => {
@@ -158,8 +162,8 @@ test('back-filling a flagged gap asks which part is still missing', () => {
   assert.equal(e.wx.sheets.length, 1);
   assert.match(e.wx.sheets[0].alertText, /2026-09-21/);
   assert.deepEqual(e.wx.sheets[0].itemList, ['已补齐，都没有漏录', '07-27 ~ 08-24 仍有漏录', '08-24 ~ 09-21 仍有漏录', '两段都仍有漏录']);
-  assert.deepEqual(copy(e.p.data.cycleLengths), [28, 28, 28, 28]);
-  assert.equal(e.p.data.quality, 'regular');
+  assert.deepEqual(copy(e.p._model.cycleLengths), [28, 28, 28, 28]);
+  assert.equal(e.p._model.quality, 'regular');
   assert.notEqual(e.p.data.fertileWindow, '');
 });
 
@@ -208,15 +212,15 @@ test('an interval containing an unreviewed legacy start is not counted as a cycl
   const e = page(raw);
   const ids = e.p._state.periods.map(p => p.id);
   for (const id of [ids[0], ids[2]]) { e.p.openEditor(id); e.p.saveEditor(); }
-  assert.deepEqual(copy(e.p.data.cycleLengths), []);
+  assert.deepEqual(copy(e.p._model.cycleLengths), []);
   assert.deepEqual(excluded(e), ['2026-06-01->2026-07-27']);
-  assert.equal(e.p.data.excludedIntervals[0].reason, 'review');
+  assert.equal(e.p._model.excludedIntervals[0].reason, 'review');
   assert.match(e.p.data.recordedIntervalText, /1 个跨越待核对记录/);
   // The newer 08-24 legacy record is still unreviewed, so the latest confirmed start is not trusted.
-  assert.equal(e.p.data.predictionStatus, 'review');
+  assert.equal(e.p._model.predictionStatus, 'review');
   assert.equal(e.p.data.nextPeriodStart, '');
   for (const id of [ids[1], ids[3]]) { e.p.openEditor(id); e.p.saveEditor(); }
-  assert.deepEqual(copy(e.p.data.cycleLengths), [28, 28, 28]);
+  assert.deepEqual(copy(e.p._model.cycleLengths), [28, 28, 28]);
 });
 
 test('statistics and predictions use the same recent window', () => {

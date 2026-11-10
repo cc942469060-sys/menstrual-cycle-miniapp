@@ -133,17 +133,6 @@ function predictNextPeriod(lastStart, cycleLength, periodLength = 5) {
   return { start, end: addDays(start, periodLength - 1) };
 }
 
-function predictWithMovingAverage(periods, minSamples = 3, maxSamples = 12) {
-  if (!Number.isInteger(minSamples) || minSamples < 1 || !Number.isInteger(maxSamples) || maxSamples < minSamples || maxSamples > 120) throw new Error('样本数量无效');
-  const stats = calculateStats(periods);
-  const samples = stats.cycleLengths.slice(-maxSamples);
-  if (samples.length < minSamples) return null;
-  const avgCycleLength = mean(samples);
-  return { avgCycleLength, nextStart: addDays(stats.lastPeriodStart, avgCycleLength), sampleCount: samples.length, min: Math.min(...samples), max: Math.max(...samples) };
-}
-
-function getOvulationDay(nextStart) { return nextStart ? addDays(nextStart, -14) : ''; }
-
 function getFertileWindow(earliestNextStart, latestNextStart = earliestNextStart) {
   const ovulationStart = addDays(earliestNextStart, -16);
   const ovulationEnd = addDays(latestNextStart, -10);
@@ -259,9 +248,10 @@ function computePredictions(state, today) {
   return result;
 }
 
-function generateCalendarGrid(year, month, periods, predictions, draft, today) {
+// weekStartsOn: 0 puts Sunday in the first column, 1 puts Monday there.
+function generateCalendarGrid(year, month, periods, predictions, draft, today, weekStartsOn = 0) {
   const first = monthStart(year, month);
-  const start = addDays(first, -getFirstDayOfWeek(year, month));
+  const start = addDays(first, -((getFirstDayOfWeek(year, month) - weekStartsOn + 7) % 7));
   const predicted = new Set(predictions.predictedDates);
   const ovulation = new Set(predictions.ovulationDates);
   const fertile = new Set(predictions.fertileDates);
@@ -274,18 +264,13 @@ function generateCalendarGrid(year, month, periods, predictions, draft, today) {
     const isPredicted = !hit && predicted.has(date);
     return {
       date, day: parsed.getUTCDate(), isCurrentMonth: parsed.getUTCMonth() + 1 === month && parsed.getUTCFullYear() === year,
-      isToday: date === today, isFuture: date > today, isWeekend: [0, 6].includes(parsed.getUTCDay()),
-      periodId: hit ? hit.id : '', isMarked: !!confirmed, isUnreviewed: !!unreviewed,
+      isToday: date === today, isMarked: !!confirmed, isUnreviewed: !!unreviewed,
       isPeriodStart: !!confirmed && date === hit.start, isPeriodEnd: !!confirmed && date === hit.end,
       isPending: !!draft && date === draft.start, isPredicted,
       // Actual records take precedence over predicted periods, which take precedence over estimated windows.
       isOvulation: !hit && !isPredicted && ovulation.has(date), isFertile: !hit && !isPredicted && fertile.has(date),
     };
   });
-}
-
-function getPeriodBoundaries(periods) {
-  return { startSet: new Set(periods.map(p => p.start)), endSet: new Set(periods.filter(p => p.end).map(p => p.end)) };
 }
 
 // Returns the gap-flagged interval that a newly placed confirmed event splits, if any.
@@ -304,5 +289,4 @@ function findSplitGap(previousPeriods, nextPeriods, id) {
 
 module.exports = { DAY_MS, CYCLE_MIN, CYCLE_MAX, PERIOD_MAX, MODEL_WINDOW, FERTILE_CYCLES, ONGOING_PROMPT_DAYS, parseDate, formatDate, formatUTC,
   isDate, dateNumber, daysBetween, addDays, getDaysInMonth, getFirstDayOfWeek, extractPeriods, median, effectiveEnd, calculateStats,
-  predictNextPeriod, predictWithMovingAverage, getOvulationDay, getFertileWindow, computePredictions, generateCalendarGrid,
-  getPeriodBoundaries, findSplitGap };
+  predictNextPeriod, getFertileWindow, computePredictions, generateCalendarGrid, findSplitGap };

@@ -1,24 +1,32 @@
+/* Text colours keep at least 4.5:1 contrast on their backgrounds; decorative accents stay brand pink. */
+
 /* ==================== 基础 ==================== */
 .container {
   padding: 0 24rpx 60rpx;
 }
 
-/* ==================== 头部 ==================== */
-.header {
-  text-align: center;
-  padding: 48rpx 0 28rpx;
+/* ==================== 状态卡 ==================== */
+.status-card {
+  margin: 32rpx 0 24rpx;
+  padding: 32rpx;
+  background: #fff;
+  border-radius: 24rpx;
+  box-shadow: 0 4rpx 20rpx rgba(255, 107, 138, 0.12);
 }
-.header-title {
-  font-size: 44rpx;
+.status-title {
+  font-size: 40rpx;
   font-weight: 700;
-  color: #FF6B8A;
-  letter-spacing: 4rpx;
+  color: #C2405F;
+  line-height: 1.4;
 }
-.header-subtitle {
-  font-size: 24rpx;
-  color: #C49DA4;
-  margin-top: 10rpx;
+.status-detail {
+  margin-top: 8rpx;
+  font-size: 26rpx;
+  color: #5C5C5C;
+  line-height: 1.6;
 }
+.status-period { background: #FFF0F3; }
+.status-alert .status-title { color: #A12D46; }
 
 /* ==================== 月份导航 ==================== */
 .month-nav {
@@ -71,14 +79,14 @@
 }
 .today-btn-text {
   font-size: 26rpx;
-  color: #FF6B8A;
+  color: #C2405F;
   font-weight: 600;
 }
 
 .pending-tip {
   text-align: center;
   font-size: 24rpx;
-  color: #FF6B8A;
+  color: #A4415C;
   margin-bottom: 12rpx;
   background: #FFF0F3;
   padding: 12rpx 20rpx;
@@ -99,9 +107,9 @@
   flex: 1;
   text-align: center;
   font-size: 26rpx;
-  color: #888;
+  color: #6B6B6B;
 }
-.text-weekend { color: #FF6B8A; }
+.text-weekend { color: #C2405F; }
 
 /* ==================== 日历网格 ==================== */
 .calendar-grid {
@@ -135,7 +143,7 @@
 }
 
 .day-tag {
-  font-size: 18rpx;
+  font-size: 20rpx;
   color: #fff;
   position: absolute;
   top: 4rpx;
@@ -143,35 +151,21 @@
   border-radius: 16rpx;
   line-height: 1.6;
 }
-.start-tag { background: #E8738A; right: 4rpx; }
-.end-tag   { background: #E8738A; left: 4rpx; }
+.start-tag { background: #C2405F; right: 4rpx; }
+.end-tag   { background: #C2405F; left: 4rpx; }
 
 .ovu-dot {
-  width: 10rpx;
-  height: 10rpx;
+  width: 12rpx;
+  height: 12rpx;
   border-radius: 50%;
-  background: #5BA0F5;
+  background: #3D82D9;
   margin-top: 2rpx;
 }
 
-/* ---- 非当月 ---- */
-.day-cell.dimmed .day-num { color: #ddd; }
+.review-tag { font-size: 18rpx; color: #7A5C10; position: absolute; bottom: 2rpx; }
 
-/* ---- 周末 ---- */
-.day-cell.weekend .day-num { color: #FF8FA3; }
-
-/* ---- 今天（仅非经期/非预测日显示） ---- */
-.day-cell.today .day-num {
-  color: #5BA0F5;
-  font-weight: 700;
-  border: 3rpx solid #5BA0F5;
-}
-
-/* ---- 待定开始日（仅非经期日显示，经期日由 period-* 样式主导） ---- */
-.day-cell.pending .day-num {
-  color: #FF6B8A;
-  border: 3rpx solid #FF6B8A;
-}
+/* ---- 非当月（可点击，会切换到那个月） ---- */
+.day-cell.dimmed .day-num { color: #949494; }
 
 /* ---- 经期中间日 ---- */
 .day-cell.period-mid { background: #FFE0E6; }
@@ -191,25 +185,33 @@
 }
 .day-cell.period-start .day-num,
 .day-cell.period-end .day-num {
-  color: #fff;
+  color: #7A1F35;
   font-weight: 700;
 }
 
-/* ---- 排卵日 ---- */
-.day-cell.ovulation .ovu-dot {
-  width: 14rpx;
-  height: 14rpx;
-  background: #5BA0F5;
-}
-
-/* ---- 预测经期 ---- */
+/* ---- 预测与估计窗口 ---- */
 .day-cell.predicted { background: #FFF5F7; }
 .day-cell.predicted .day-num {
-  color: #FF6B8A;
-  border: 2rpx dashed #FFB6C1;
+  color: #C2405F;
+  border: 2rpx dashed #E8738A;
+}
+.day-cell.unreviewed { background: #FFF4CD; }
+.day-cell.fertile { background: #D3EFD9; }
+
+/* ---- 今天，然后是待定开始日：同一天时待定开始日更醒目 ---- */
+.day-cell.today .day-num {
+  color: #2F6FC4;
+  font-weight: 700;
+  border: 3rpx solid #2F6FC4;
+}
+.day-cell.pending .day-num {
+  color: #C2405F;
+  font-weight: 700;
+  background: #FFF0F3;
+  border: 3rpx solid #C2405F;
 }
 
-/* ==================== 图例卡片 ==================== */
+/* ==================== 卡片 ==================== */
 .section-card {
   margin-top: 24rpx;
   background: #fff;
@@ -230,13 +232,14 @@
 }
 .card-sub {
   font-size: 22rpx;
-  color: #999;
+  color: #707070;
 }
 .card-arrow {
   font-size: 22rpx;
-  color: #ccc;
+  color: #8C8C8C;
 }
 
+/* ==================== 图例 ==================== */
 .legend-row {
   display: flex;
   flex-wrap: wrap;
@@ -248,7 +251,7 @@
   margin-right: 36rpx;
   margin-bottom: 14rpx;
   font-size: 24rpx;
-  color: #666;
+  color: #5C5C5C;
 }
 .legend-swatch {
   width: 30rpx;
@@ -257,12 +260,12 @@
   margin-right: 10rpx;
 }
 .swatch-period    { background: #FF9EAF; }
-.swatch-ovulation { background: #5BA0F5; }
-.swatch-predicted { background: #FFF5F7; border: 2rpx dashed #FFB6C1; }
+.swatch-ovulation { background: #3D82D9; }
+.swatch-predicted { background: #FFF5F7; border: 2rpx dashed #E8738A; }
+.swatch-review    { background: #FFF4CD; }
+.swatch-fertile   { background: #D3EFD9; }
 
 /* ==================== 统计面板 ==================== */
-.stats-card { margin-top: 24rpx; }
-
 .stats-grid {
   display: flex;
   flex-wrap: wrap;
@@ -279,20 +282,21 @@
   word-break: break-all;
 }
 .stat-value.highlight {
-  color: #FF6B8A;
+  color: #C2405F;
 }
 .stat-unit {
   font-size: 22rpx;
   font-weight: 400;
-  color: #999;
+  color: #707070;
 }
 .stat-label {
   font-size: 22rpx;
-  color: #999;
+  color: #707070;
   margin-top: 6rpx;
 }
+.model-note { margin-top: 12rpx; font-size: 22rpx; color: #707070; line-height: 1.6; }
 
-/* ==================== 未来预测列表 ==================== */
+/* ==================== 外推候选经期 ==================== */
 .upcoming-section {
   margin-top: 24rpx;
   padding-top: 20rpx;
@@ -300,7 +304,7 @@
 }
 .upcoming-title {
   font-size: 24rpx;
-  color: #999;
+  color: #707070;
   margin-bottom: 16rpx;
 }
 .upcoming-list {
@@ -325,9 +329,13 @@
   color: #333;
 }
 
-/* ==================== 周期设置 ==================== */
-.settings-card { margin-top: 24rpx; }
+/* ==================== 记录列表 ==================== */
+.record-row { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; padding: 24rpx 0; border-bottom: 1rpx solid #F5F5F5; }
+.record-date { font-size: 25rpx; color: #333; }
+.record-status { font-size: 22rpx; color: #A4415C; flex-shrink: 0; }
+.review-status { color: #7A5C10; }
 
+/* ==================== 设置 ==================== */
 .settings-row {
   display: flex;
   align-items: center;
@@ -346,63 +354,17 @@
   font-weight: 500;
 }
 .setting-hint {
-  font-size: 20rpx;
-  color: #bbb;
+  font-size: 22rpx;
+  color: #707070;
   margin-top: 4rpx;
 }
-.setting-stepper {
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-}
-.stepper-btn {
-  width: 48rpx;
-  height: 48rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.picker-value {
+  padding: 12rpx 24rpx;
+  border-radius: 12rpx;
   background: #FFF0F3;
-  border-radius: 50%;
-  font-size: 28rpx;
-  color: #FF6B8A;
-  font-weight: 600;
-}
-.stepper-value {
-  font-size: 26rpx;
-  color: #333;
-  font-weight: 600;
-  min-width: 64rpx;
-  text-align: center;
-}
-
-/* ==================== 使用提示 ==================== */
-.tips-card {
-  margin-top: 24rpx;
-  background: #FFF9E6;
-  border-radius: 16rpx;
-  padding: 24rpx;
-  display: flex;
-}
-.tips-icon {
-  font-size: 40rpx;
-  margin-right: 16rpx;
-  flex-shrink: 0;
-}
-.tips-title {
+  color: #A4415C;
   font-size: 26rpx;
   font-weight: 600;
-  color: #B8860B;
-  margin-bottom: 8rpx;
-}
-.tips-desc {
-  font-size: 24rpx;
-  color: #9A7D2F;
-  line-height: 1.7;
-  margin-bottom: 8rpx;
-}
-.tips-desc .bold {
-  font-weight: 600;
-  color: #7A6018;
 }
 
 /* ==================== 底部 ==================== */
@@ -412,19 +374,19 @@
 }
 .reset-btn {
   font-size: 24rpx !important;
-  color: #ccc !important;
+  color: #707070 !important;
   background: none !important;
   border: none !important;
   line-height: 1 !important;
 }
 .reset-btn::after { border: none; }
 .footer-text {
-  font-size: 20rpx;
-  color: #ddd;
+  font-size: 22rpx;
+  color: #707070;
   margin-top: 12rpx;
 }
 
-/* ==================== 首次使用设置弹窗 ==================== */
+/* ==================== 弹窗 ==================== */
 .setup-overlay {
   position: fixed;
   top: 0;
@@ -462,29 +424,24 @@
   text-align: center;
   margin-bottom: 36rpx;
 }
-
 .setup-icon {
   font-size: 64rpx;
   margin-bottom: 16rpx;
 }
-
 .setup-title {
   font-size: 36rpx;
   font-weight: 700;
   color: #333;
   margin-bottom: 10rpx;
 }
-
 .setup-desc {
   font-size: 24rpx;
-  color: #999;
+  color: #707070;
   line-height: 1.6;
 }
-
 .setup-body {
   margin-bottom: 32rpx;
 }
-
 .setup-row {
   display: flex;
   align-items: center;
@@ -492,62 +449,28 @@
   padding: 24rpx 0;
   border-top: 1rpx solid #f5f5f5;
 }
-
 .setup-row:first-child {
   border-top: none;
 }
-
 .setup-label {
   display: flex;
   flex-direction: column;
 }
-
 .setup-name {
   font-size: 28rpx;
   color: #333;
   font-weight: 500;
 }
-
 .setup-hint {
   font-size: 22rpx;
-  color: #bbb;
+  color: #707070;
   margin-top: 4rpx;
 }
-
-.setup-stepper {
-  display: flex;
-  align-items: center;
-  gap: 20rpx;
-}
-
-.setup-stepper-btn {
-  width: 52rpx;
-  height: 52rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #FFF0F3;
-  border-radius: 50%;
-  font-size: 30rpx;
-  color: #FF6B8A;
-  font-weight: 600;
-  line-height: 1;
-}
-
-.setup-stepper-value {
-  font-size: 28rpx;
-  color: #333;
-  font-weight: 600;
-  min-width: 72rpx;
-  text-align: center;
-}
-
 .setup-footer {
   display: flex;
   flex-direction: column;
   gap: 16rpx;
 }
-
 .setup-btn {
   width: 100%;
   height: 88rpx;
@@ -558,42 +481,29 @@
   font-size: 30rpx;
   font-weight: 600;
 }
-
 .setup-btn-primary {
   background: linear-gradient(135deg, #FF6B8A, #FF8FA3);
   color: #fff;
   box-shadow: 0 6rpx 20rpx rgba(255, 107, 138, 0.25);
 }
-
 .setup-btn-ghost {
   background: transparent;
-  color: #bbb;
+  color: #707070;
   font-weight: 400;
   font-size: 26rpx;
 }
 
-/* Record editing and uncertainty indicators */
-.notice-card { margin: 20rpx 0; padding: 24rpx; border-radius: 16rpx; background: #FFF9E6; color: #886817; font-size: 24rpx; line-height: 1.6; }
-.error-card { background: #FFF0F3; color: #AD3453; }
+/* ==================== 编辑与提示 ==================== */
+.notice-card { margin: 20rpx 0; padding: 24rpx; border-radius: 16rpx; background: #FFF9E6; color: #6E5410; font-size: 24rpx; line-height: 1.6; }
+.error-card { margin-top: 32rpx; background: #FFF0F3; color: #A12D46; }
+.error-hint { margin-top: 12rpx; }
 .editor-modal { max-height: 85vh; overflow-y: auto; }
 .editor-row { display: flex; justify-content: space-between; align-items: center; gap: 20rpx; padding: 24rpx 0; border-bottom: 1rpx solid #F2F2F2; font-size: 26rpx; }
 .date-input { padding: 12rpx 20rpx; border-radius: 12rpx; background: #FFF0F3; color: #B14461; }
 .gap-label { display: flex; flex-direction: column; flex: 1; }
 .editor-actions, .draft-actions { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 24rpx; }
 .primary-action, .secondary-action, .delete-action, .small-action { font-size: 24rpx; margin: 12rpx 0 0; border-radius: 12rpx; }
-.primary-action { background: #FF6B8A; color: #FFF; }
+.primary-action { background: #C2405F; color: #FFF; }
 .secondary-action, .small-action { background: #FFF0F3; color: #A4415C; }
-.delete-action { background: #FFF; color: #B03649; }
+.delete-action { background: #FFF; color: #A12D46; }
 .small-action { margin: 0; padding: 0 20rpx; font-size: 22rpx; }
-.model-note { margin-top: 12rpx; font-size: 22rpx; color: #777; line-height: 1.6; }
-.prediction-status { color: #A4415C; font-size: 26rpx; font-weight: 600; margin-top: 18rpx; }
-.record-row { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; padding: 24rpx 0; border-bottom: 1rpx solid #F5F5F5; }
-.record-date { font-size: 25rpx; color: #333; }
-.record-status { font-size: 22rpx; color: #A4415C; flex-shrink: 0; }
-.review-status { color: #997315; }
-.day-cell.unreviewed { background: #FFF4CD; }
-.review-tag { font-size: 16rpx; color: #997315; position: absolute; bottom: 2rpx; }
-.day-cell.fertile { background: #ECF8EE; }
-.swatch-review { background: #FFF4CD; }
-.swatch-fertile { background: #ECF8EE; }
-.day-cell.today .day-num { border: 3rpx solid #5BA0F5; }

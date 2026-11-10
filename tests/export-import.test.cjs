@@ -101,7 +101,8 @@ test('a new phone can import straight from the first-run setup dialog', () => {
   assert.equal(e.p._state.periods.length, 2);
   assert.equal(e.wx.values.has(S.RESTORE_BACKUP), false);
   const wxml = fs.readFileSync(path.join(root, 'pages/index/index.wxml'), 'utf8');
-  const setupFooter = wxml.slice(wxml.indexOf('setup-footer'), wxml.indexOf('editorVisible'));
+  const setupFooter = wxml.slice(wxml.indexOf('class="setup-footer"'), wxml.indexOf('wx:if="{{editorVisible}}"'));
+  assert(setupFooter.length > 0);
   assert(setupFooter.includes('bindtap="importBackup"'));
 });
 

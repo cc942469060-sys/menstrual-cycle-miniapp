@@ -4,6 +4,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const C = require('../utils/cycle');
 const S = require('../utils/store');
+const V = require('../utils/view');
 
 const root = path.resolve(__dirname, '..');
 const pageSource = fs.readFileSync(path.join(root, 'pages/index/index.js'), 'utf8');
@@ -70,13 +71,24 @@ function page(initial = stateWith(), options = {}) {
   let instant = options.today || '2026-10-03T12:00:00';
   class ClockDate extends Date { constructor(...args) { super(...(args.length ? args : [instant])); } static now() { return new Date(instant).getTime(); } }
   let def;
+  const modules = { store: S, view: V, cycle: C };
   vm.runInNewContext(pageSource, { Page: value => { def = value; }, wx, Date: ClockDate,
-    require: name => name.includes('store') ? S : C, setTimeout: (fn, ms) => wx.setTimeout(fn, ms), clearTimeout: id => wx.clearTimeout(id) },
+    require: name => modules[name.split('/').pop()], setTimeout: (fn, ms) => wx.setTimeout(fn, ms), clearTimeout: id => wx.clearTimeout(id) },
     { filename: path.join(root, 'pages/index/index.js') });
-  const p = { ...def, data: copy(def.data), setData(value) { Object.assign(this.data, value); } };
+  // Every setData payload is kept so tests can check what crosses to the view layer.
+  const calls = [];
+  const p = { ...def, data: copy(def.data), setData(value) {
+    calls.push(copy(value));
+    // Like WeChat, "key[index]" paths update one item of an existing array.
+    Object.keys(value).forEach(key => {
+      const item = /^(\w+)\[(\d+)\]$/.exec(key);
+      if (item) this.data[item[1]][Number(item[2])] = value[key];
+      else this.data[key] = value[key];
+    });
+  } };
   p.onLoad();
-  return { p, wx, def, tap: date => p.onDayTap({ currentTarget: { dataset: { date, iscurrentmonth: true } } }),
+  return { p, wx, def, calls, tap: date => p.onDayTap({ currentTarget: { dataset: { date } } }),
     setNow: value => { instant = value; }, snapshot: () => copy(wx.values.get(S.KEY)) };
 }
 
-module.exports = { C, S, root, copy, record, stateWith, storage, page };
+module.exports = { C, S, V, root, copy, record, stateWith, storage, page };
