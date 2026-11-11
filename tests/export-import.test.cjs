@@ -16,7 +16,12 @@ function exportedText(state = two()) {
 
 function chooseFile(e, text) {
   e.wx.files.set('wxfile://tmp/chat.json', text);
-  e.wx.options.chosenFile = { path: 'wxfile://tmp/chat.json', size: text.length, name: '经期记录备份-2026-10-03.json', type: 'file' };
+  e.wx.options.chosenFile = {
+    path: 'wxfile://tmp/chat.json',
+    size: text.length,
+    name: '经期记录备份-2026-10-03.json',
+    type: 'file',
+  };
   e.wx.options.sheetIndex = 0;
 }
 
@@ -25,7 +30,9 @@ function chooseFile(e, text) {
 test('sending a backup writes every record to a file and shares it to a chat', () => {
   const e = page(two());
   e.p.exportToChat();
-  assert.deepEqual(e.wx.shared, [{ filePath: 'wxfile://usr/cycle-backup.json', fileName: '经期记录备份-2026-10-03.json' }]);
+  assert.deepEqual(e.wx.shared, [
+    { filePath: 'wxfile://usr/cycle-backup.json', fileName: '经期记录备份-2026-10-03.json' },
+  ]);
   const file = JSON.parse(e.wx.files.get('wxfile://usr/cycle-backup.json'));
   assert.deepEqual([file.app, file.format, file.exportedAt], ['menstrual-cycle-miniapp', 1, '2026-10-03']);
   assert.deepEqual(file.data, two());
@@ -78,7 +85,10 @@ test('an exported file imports on another phone, and the replaced records stay r
   assert.deepEqual(e.wx.values.get(S.RESTORE_BACKUP), previous);
   assert.equal(e.p.data.periodCount, 2);
   assert.equal(e.wx.toasts.at(-1).title, '已导入 2 条记录');
-  assert.deepEqual(S.listBackups(e.wx, '2026-10-03').map(item => item.label), ['最近一次恢复或导入前']);
+  assert.deepEqual(
+    S.listBackups(e.wx, '2026-10-03').map(item => item.label),
+    ['最近一次恢复或导入前'],
+  );
 });
 
 test('the backup text can be pasted back from the clipboard', () => {
@@ -110,10 +120,16 @@ test('damaged, foreign, empty, or oversized content is rejected without changing
   const e = page(stateWith([record('2026-09-01')]));
   const before = e.snapshot();
   const envelope = JSON.parse(exportedText());
-  const samples = ['', 'not json', '"text"', '[]', JSON.stringify({ other: true }),
+  const samples = [
+    '',
+    'not json',
+    '"text"',
+    '[]',
+    JSON.stringify({ other: true }),
     JSON.stringify({ ...envelope, format: 99 }),
     JSON.stringify({ ...envelope, data: stateWith([record('2026-09-01'), record('2026-09-03')]) }),
-    JSON.stringify(stateWith())];
+    JSON.stringify(stateWith()),
+  ];
   e.wx.options.sheetIndex = 1;
   for (const text of samples) {
     e.wx.clip.text = text;
@@ -147,7 +163,10 @@ test('cancelling at any step leaves the current records alone', () => {
 test('privacy errors explain what is missing, while a cancelled share stays silent', () => {
   const e = page(two());
   e.wx.options.sheetIndex = 0;
-  e.wx.options.chooseFailure = { errMsg: 'chooseMessageFile:fail api scope is not declared in the privacy agreement', errno: 112 };
+  e.wx.options.chooseFailure = {
+    errMsg: 'chooseMessageFile:fail api scope is not declared in the privacy agreement',
+    errno: 112,
+  };
   e.p.importBackup();
   assert.equal(e.wx.modals.at(-1).title, '功能未开通');
   assert.match(e.wx.modals.at(-1).content, /用户隐私保护指引/);
@@ -163,11 +182,14 @@ test('privacy errors explain what is missing, while a cancelled share stays sile
 test('imports accept the export file, a bare stored record, and the legacy format', () => {
   const today = '2026-10-03';
   assert.equal(S.previewImport(exportedText(), today).count, 2);
-  assert.equal(S.previewImport(String.fromCharCode(0xFEFF) + exportedText(), today).count, 2);
+  assert.equal(S.previewImport(String.fromCharCode(0xfeff) + exportedText(), today).count, 2);
   assert.equal(S.previewImport(JSON.stringify(two()), today).count, 2);
   const legacy = S.importText(storage(two()), JSON.stringify({ markedDates: ['2026-08-01', '2026-08-02'] }), today);
   assert.equal(legacy.ok, true);
-  assert.deepEqual(legacy.state.periods.map(p => p.status), ['needsReview']);
+  assert.deepEqual(
+    legacy.state.periods.map(p => p.status),
+    ['needsReview'],
+  );
   assert(legacy.warnings.length > 0);
 });
 

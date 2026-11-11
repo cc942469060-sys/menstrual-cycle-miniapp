@@ -1,6 +1,6 @@
 # 经期助手
 
-微信小程序，用于保存实际经期并提供带适用性说明的日期估计。开发者工具导入项目目录即可运行；无运行时第三方依赖。
+微信小程序，用于保存实际经期并提供带适用性说明的日期估计。开发者工具导入项目目录即可运行；无运行时第三方依赖（唯一的开发依赖是代码格式化工具 Prettier）。
 
 ## 记录与纠错
 
@@ -70,8 +70,19 @@
 npm test
 ```
 
-或直接 `node --test`。测试使用内存存储和模拟页面（`tests/helpers.cjs`），不修改真实微信记录。`tests/business.test.cjs` 覆盖审计的全部 15 项问题，以及旧版迁移、草稿恢复、独立编辑、进行中事件、重置备份和时间回拨，包含上海、纽约、柏林、阿皮亚四个时区的子进程日期验证。`tests/cycle-logic.test.cjs` 覆盖进行中经期的结束流程、易孕窗口范围、统计口径、漏录标记和备份恢复。`tests/export-import.test.cjs` 覆盖导出文件与剪贴板文本、跨设备导入、首次设置时导入、异常内容拒绝、取消操作和隐私接口报错。`tests/view.test.cjs` 覆盖只发送变化数据、前台恢复不重复渲染、选择器、状态卡文案、同一天再次点击、相邻月份点击、周一起始，以及模板和样式的关键约束。`tests/repair.test.cjs` 覆盖异常记录隔离、设置与草稿回退默认、不可自动修复的情况和备份失败时停止。`tests/project.test.cjs` 检查 CI 配置、打包排除项和提示文字长度。
+或直接 `node --test`。测试使用内存存储和模拟页面（`tests/helpers.cjs`），不修改真实微信记录。`tests/business.test.cjs` 覆盖审计的全部 15 项问题，以及旧版迁移、草稿恢复、独立编辑、进行中事件、重置备份和时间回拨，包含上海、纽约、柏林、阿皮亚四个时区的子进程日期验证。`tests/cycle-logic.test.cjs` 覆盖进行中经期的结束流程、易孕窗口范围、统计口径、漏录标记和备份恢复。`tests/export-import.test.cjs` 覆盖导出文件与剪贴板文本、跨设备导入、首次设置时导入、异常内容拒绝、取消操作和隐私接口报错。`tests/view.test.cjs` 覆盖只发送变化数据、前台恢复不重复渲染、选择器、状态卡文案、同一天再次点击、相邻月份点击、周一起始，以及模板和样式的关键约束。`tests/repair.test.cjs` 覆盖异常记录隔离、设置与草稿回退默认、不可自动修复的情况和备份失败时停止。`tests/project.test.cjs` 检查 CI 配置、打包排除项、格式化配置和提示文字长度。
 
-GitHub Actions（`.github/workflows/test.yml`）会在每个 PR 和推送到 `main` 时用 Node 24 运行 `npm test`。
+## 代码格式
 
-微信打包配置排除测试目录、`.github` 和 Node 测试说明文件。开发者工具/真机仍需验证选择器、弹窗、视图样式和本地存储的原生交互，以及文件转发、选择聊天文件、剪贴板和隐私授权弹窗的实际表现。
+代码格式由 Prettier 统一（版本固定在 `package.json` 的 `devDependencies`，配置见 `.prettierrc.json`：行宽 120、单引号、单参数箭头函数不加括号；WXSS 按 CSS 格式化）。首次使用先运行 `npm ci` 安装，然后：
+
+```powershell
+npm run format        # 格式化
+npm run format:check  # 只检查，不改文件
+```
+
+Prettier 不支持 WXML，WXML 保持手写格式；README 等 Markdown 和由开发者工具维护的 `project.config.json` 也不参与格式化（见 `.prettierignore`）。
+
+GitHub Actions（`.github/workflows/test.yml`）会在每个 PR 和推送到 `main` 时用 Node 24 先 `npm ci`，再运行 `npm test` 和 `npm run format:check`。
+
+微信打包配置排除测试目录、`.github`、`node_modules`、npm 和 Prettier 的配置文件以及 README。开发者工具/真机仍需验证选择器、弹窗、视图样式和本地存储的原生交互，以及文件转发、选择聊天文件、剪贴板和隐私授权弹窗的实际表现。

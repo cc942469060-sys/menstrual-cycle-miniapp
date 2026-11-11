@@ -5,17 +5,30 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { C, S, V, root, record, stateWith, storage, page } = require('./helpers.cjs');
 
-const starts = (first, intervals) => intervals.reduce((list, n) => [...list, C.addDays(list[list.length - 1], n)], [first]);
+const starts = (first, intervals) =>
+  intervals.reduce((list, n) => [...list, C.addDays(list[list.length - 1], n)], [first]);
 const pickCycle = days => ({ detail: { value: String(days - V.CYCLE_PICK_MIN) } });
 const pickPeriod = days => ({ detail: { value: String(days - 1) } });
-const manualPrefs = e => [e.p._state.preferences.predictionMode, e.p._state.preferences.manualCycleLength, e.p._state.preferences.manualPeriodLength];
+const manualPrefs = e => [
+  e.p._state.preferences.predictionMode,
+  e.p._state.preferences.manualCycleLength,
+  e.p._state.preferences.manualPeriodLength,
+];
 
 // ---- What crosses to the view layer ----
 
 test('only rendered fields reach the view, and later renders send only what changed', () => {
   const e = page(stateWith(starts('2025-01-05', Array(20).fill(29)).map(start => record(start))));
   const first = e.calls.find(call => 'calendarGrid' in call);
-  for (const key of ['predictedDates', 'fertileDates', 'ovulationDates', 'cycleLengths', 'recordedIntervals', 'quality', 'effectiveCycleLength']) {
+  for (const key of [
+    'predictedDates',
+    'fertileDates',
+    'ovulationDates',
+    'cycleLengths',
+    'recordedIntervals',
+    'quality',
+    'effectiveCycleLength',
+  ]) {
     assert(!(key in first), `${key} is not rendered`);
   }
   const size = JSON.stringify(first).length;
@@ -23,7 +36,11 @@ test('only rendered fields reach the view, and later renders send only what chan
 
   const before = e.calls.length;
   e.p.goToToday();
-  assert.deepEqual(e.calls.slice(before).map(call => Object.keys(call)), [['year', 'month']], 'an unchanged calendar sends nothing');
+  assert.deepEqual(
+    e.calls.slice(before).map(call => Object.keys(call)),
+    [['year', 'month']],
+    'an unchanged calendar sends nothing',
+  );
 
   const index = e.p._grid.findIndex(c => c.date === '2026-10-01');
   e.tap('2026-10-01');
@@ -52,7 +69,10 @@ test('picking manual values writes once and keeps the period shorter than the cy
   assert.equal(e.wx.writes.length, writes + 1);
   assert.deepEqual(manualPrefs(e), ['manual', 32, 5]);
   e.p.onPeriodPick(pickPeriod(7));
-  assert.deepEqual([e.p.data.settingCycleLength, e.p.data.settingPeriodLength, e.p.data.cycleIndex, e.p.data.periodIndex], [32, 7, 17, 6]);
+  assert.deepEqual(
+    [e.p.data.settingCycleLength, e.p.data.settingPeriodLength, e.p.data.cycleIndex, e.p.data.periodIndex],
+    [32, 7, 17, 6],
+  );
   e.p.onPeriodPick(pickPeriod(15));
   e.p.onCyclePick(pickCycle(15));
   assert.deepEqual(manualPrefs(e), ['manual', 15, 14], 'a shorter cycle pulls the period below it');
@@ -67,7 +87,10 @@ test('setup pickers keep the period shorter than the cycle', () => {
   const e = page(undefined, { storage: storage() });
   e.p.onSetupPeriodPick(pickPeriod(15));
   e.p.onSetupCyclePick(pickCycle(15));
-  assert.deepEqual([e.p.data.setupCycleLength, e.p.data.setupPeriodLength, e.p.data.setupCycleIndex, e.p.data.setupPeriodIndex], [15, 14, 0, 13]);
+  assert.deepEqual(
+    [e.p.data.setupCycleLength, e.p.data.setupPeriodLength, e.p.data.setupCycleIndex, e.p.data.setupPeriodIndex],
+    [15, 14, 0, 13],
+  );
   e.p.onSetupPeriodPick(pickPeriod(15));
   assert.equal(e.wx.toasts.at(-1).title, '经期参考须小于周期参考');
   e.p.confirmSetup();
@@ -80,9 +103,19 @@ test('the status card tells the user where they are in the cycle', () => {
   const status = (state, today) => V.describeStatus(C.computePredictions(state, today), today);
   const regular = stateWith(['2026-06-10', '2026-07-08', '2026-08-05', '2026-09-02'].map(start => record(start)));
   assert.equal(status(stateWith(), '2026-10-03').title, '还没有经期记录');
-  assert.deepEqual(status(regular, '2026-09-20'), { tone: 'normal', title: '距下次经期约 10 天', detail: '预计 2026-09-30 开始。' });
-  assert.deepEqual([status(regular, '2026-09-30').tone, status(regular, '2026-09-30').title], ['alert', '预计今天开始']);
-  assert.deepEqual([status(regular, '2026-10-03').tone, status(regular, '2026-10-03').title], ['alert', '比预计晚了 3 天']);
+  assert.deepEqual(status(regular, '2026-09-20'), {
+    tone: 'normal',
+    title: '距下次经期约 10 天',
+    detail: '预计 2026-09-30 开始。',
+  });
+  assert.deepEqual(
+    [status(regular, '2026-09-30').tone, status(regular, '2026-09-30').title],
+    ['alert', '预计今天开始'],
+  );
+  assert.deepEqual(
+    [status(regular, '2026-10-03').tone, status(regular, '2026-10-03').title],
+    ['alert', '比预计晚了 3 天'],
+  );
   assert.match(status(stateWith([record('2026-09-20')]), '2026-10-03').detail, /仅作粗略参考/);
   const irregular = stateWith(starts('2026-04-01', [18, 45, 18, 45]).map(start => record(start)));
   assert.equal(status(irregular, '2026-08-12').title, '下次经期约在 11～38 天后');
@@ -106,7 +139,10 @@ test('tapping the chosen start again asks before recording a one-day period', ()
   e.tap('2026-10-01');
   e.wx.options.sheetIndex = 0;
   e.tap('2026-10-01');
-  assert.deepEqual(e.p._state.periods.map(p => [p.start, p.end]), [['2026-10-01', '2026-10-01']]);
+  assert.deepEqual(
+    e.p._state.periods.map(p => [p.start, p.end]),
+    [['2026-10-01', '2026-10-01']],
+  );
 });
 
 test('tapping a greyed date from a neighbouring month switches to that month and keeps the tap', () => {
@@ -115,7 +151,12 @@ test('tapping a greyed date from a neighbouring month switches to that month and
   e.tap('2026-09-30');
   assert.deepEqual([e.p.data.year, e.p.data.month], [2026, 9]);
   assert.equal(e.p._state.draft.start, '2026-09-30');
-  assert(e.p.data.calendarGrid.find(c => c.date === '2026-09-30').cls.split(' ').includes('pending'));
+  assert(
+    e.p.data.calendarGrid
+      .find(c => c.date === '2026-09-30')
+      .cls.split(' ')
+      .includes('pending'),
+  );
 });
 
 test('the week can start on Monday, and data saved before the option keeps Sunday', () => {
@@ -126,8 +167,14 @@ test('the week can start on Monday, and data saved before the option keeps Sunda
   assert.equal(C.parseDate(e.p._grid[0].date).getUTCDay(), 0);
   e.p.onWeekStartChange({ detail: { value: true } });
   assert.equal(e.snapshot().preferences.weekStartsOn, 1);
-  assert.deepEqual(e.p.data.weekdays.map(d => d.label), ['一', '二', '三', '四', '五', '六', '日']);
-  assert.deepEqual(e.p.data.weekdays.map(d => d.weekend), [false, false, false, false, false, true, true]);
+  assert.deepEqual(
+    e.p.data.weekdays.map(d => d.label),
+    ['一', '二', '三', '四', '五', '六', '日'],
+  );
+  assert.deepEqual(
+    e.p.data.weekdays.map(d => d.weekend),
+    [false, false, false, false, false, true, true],
+  );
   assert.equal(C.parseDate(e.p._grid[0].date).getUTCDay(), 1);
   assert.equal(page(undefined, { storage: e.wx }).p.data.weekStartsOn, 1);
   const invalid = stateWith();
@@ -148,9 +195,23 @@ test('the template locks page scrolling under dialogs and the pending start outr
   // Later rules win at equal specificity, so the draft start must come after today.
   assert(wxss.lastIndexOf('.day-cell.pending .day-num') > wxss.lastIndexOf('.day-cell.today .day-num'));
   assert.equal(wxss.split('.day-cell.today .day-num').length - 1, 1, 'today is styled in one place');
-  for (const unused of ['.tips-', '.day-cell.weekend', '.day-cell.ovulation', '.stepper-btn', '.header-title']) assert(!wxss.includes(unused), unused);
-  const classes = new Set(V.cellClass({ isCurrentMonth: false, isToday: true, isMarked: true, isPeriodStart: true, isPeriodEnd: true, isPredicted: true,
-    isUnreviewed: true, isFertile: true, isPending: true }).split(' ').concat(['period-mid']));
+  for (const unused of ['.tips-', '.day-cell.weekend', '.day-cell.ovulation', '.stepper-btn', '.header-title'])
+    assert(!wxss.includes(unused), unused);
+  const classes = new Set(
+    V.cellClass({
+      isCurrentMonth: false,
+      isToday: true,
+      isMarked: true,
+      isPeriodStart: true,
+      isPeriodEnd: true,
+      isPredicted: true,
+      isUnreviewed: true,
+      isFertile: true,
+      isPending: true,
+    })
+      .split(' ')
+      .concat(['period-mid']),
+  );
   for (const name of classes) assert(wxss.includes(`.${name}`), `.${name} has a style`);
 });
 
@@ -173,5 +234,8 @@ test('calendar days carry screen-reader text, and fertile days a mark that is no
   assert(wxml.includes('aria-label="{{item.label}}"'));
   assert(wxml.includes('aria-label="上个月"') && wxml.includes('aria-label="下个月"'));
   assert(wxml.includes('<view class="fertile-bar" wx:if="{{item.fertile}}"></view>'));
-  assert(wxml.includes('swatch-fertile"><view class="fertile-bar"></view>') && wxml.includes('swatch-ovulation"><view class="ovu-dot"></view>'));
+  assert(
+    wxml.includes('swatch-fertile"><view class="fertile-bar"></view>') &&
+      wxml.includes('swatch-ovulation"><view class="ovu-dot"></view>'),
+  );
 });
