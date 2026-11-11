@@ -3,6 +3,7 @@
   "packOptions": {
     "ignore": [
       { "type": "folder", "value": "tests" },
+      { "type": "folder", "value": ".github" },
       { "type": "file", "value": "package.json" },
       { "type": "file", "value": "README.md" }
     ],

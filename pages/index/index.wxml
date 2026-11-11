@@ -31,7 +31,7 @@
       <view class="editor-row"><text>开始日期</text><picker mode="date" start="1900-01-01" end="{{today}}" value="{{editorStart}}" bindchange="onEditorStartChange"><view class="date-input">{{editorStart}}</view></picker></view>
       <view class="editor-row"><text>尚未结束</text><switch checked="{{editorOngoing}}" bindchange="onEditorOngoingChange" color="#FF6B8A" /></view>
       <view class="editor-row" wx:if="{{!editorOngoing}}"><text>结束日期</text><picker mode="date" start="{{editorStart}}" end="{{today}}" value="{{editorEnd}}" bindchange="onEditorEndChange"><view class="date-input">{{editorEnd}}</view></picker></view>
-      <view class="editor-row"><text class="gap-label">上次与本次之间有漏录<text class="setting-hint">此间隔不用于周期平均和预测</text></text><switch checked="{{editorExcludeGap}}" bindchange="onEditorGapChange" color="#FF6B8A" /></view>
+      <view class="editor-row" wx:if="{{editorHasPrevious}}"><text class="gap-label">上次与本次之间有漏录<text class="setting-hint">此间隔不用于周期平均和预测</text></text><switch checked="{{editorExcludeGap}}" bindchange="onEditorGapChange" color="#FF6B8A" /></view>
       <view class="setup-desc">只保存你确认的实际日期；未来日期不会录为历史。</view>
       <view class="editor-actions">
         <button class="primary-action" bindtap="saveEditor">确认保存</button>
@@ -58,9 +58,9 @@
   </view>
   <view class="notice-card" wx:if="{{migrationMessage}}">{{migrationMessage}}</view>
   <view class="month-nav">
-    <view class="nav-btn" bindtap="prevMonth"><text class="nav-arrow">‹</text></view>
-    <view class="month-title" bindtap="goToToday">{{year}} 年 {{month}} 月</view>
-    <view class="nav-btn" bindtap="nextMonth"><text class="nav-arrow">›</text></view>
+    <view class="nav-btn" bindtap="prevMonth" aria-role="button" aria-label="上个月"><text class="nav-arrow">‹</text></view>
+    <view class="month-title" bindtap="goToToday" aria-role="button" aria-label="{{year}} 年 {{month}} 月，回到本月">{{year}} 年 {{month}} 月</view>
+    <view class="nav-btn" bindtap="nextMonth" aria-role="button" aria-label="下个月"><text class="nav-arrow">›</text></view>
   </view>
   <view class="today-bar"><view class="today-btn-centered" bindtap="goToToday"><text class="today-btn-text">今天 {{todayDateStr}}</text></view></view>
   <view class="pending-tip" wx:if="{{pendingStart}}">
@@ -69,9 +69,10 @@
   </view>
   <view class="weekday-row"><view class="weekday-cell" wx:for="{{weekdays}}" wx:key="label"><text class="{{item.weekend ? 'text-weekend' : ''}}">{{item.label}}</text></view></view>
   <view class="calendar-grid">
-    <view wx:for="{{calendarGrid}}" wx:key="date" class="{{item.cls}}" data-date="{{item.date}}" bindtap="onDayTap">
+    <view wx:for="{{calendarGrid}}" wx:key="date" class="{{item.cls}}" data-date="{{item.date}}" bindtap="onDayTap" aria-role="button" aria-label="{{item.label}}">
       <view class="day-num">{{item.day}}</view>
       <view class="ovu-dot" wx:if="{{item.ovulation}}"></view>
+      <view class="fertile-bar" wx:if="{{item.fertile}}"></view>
       <view class="day-tag start-tag" wx:if="{{item.start}}">始</view>
       <view class="day-tag end-tag" wx:if="{{item.end}}">终</view>
       <view class="review-tag" wx:if="{{item.review}}">核对</view>
@@ -83,8 +84,8 @@
       <view class="legend-item"><view class="legend-swatch swatch-period"></view><text>确认经期</text></view>
       <view class="legend-item"><view class="legend-swatch swatch-predicted"></view><text>预计经期</text></view>
       <view class="legend-item"><view class="legend-swatch swatch-review"></view><text>旧记录待核对</text></view>
-      <view class="legend-item"><view class="legend-swatch swatch-ovulation"></view><text>估计排卵窗口</text></view>
-      <view class="legend-item"><view class="legend-swatch swatch-fertile"></view><text>估计易孕窗口</text></view>
+      <view class="legend-item"><view class="legend-swatch swatch-ovulation"><view class="ovu-dot"></view></view><text>估计排卵窗口</text></view>
+      <view class="legend-item"><view class="legend-swatch swatch-fertile"><view class="fertile-bar"></view></view><text>估计易孕窗口</text></view>
     </view>
   </view>
   <view class="section-card stats-card">
@@ -102,8 +103,8 @@
     <view class="model-note" wx:if="{{fertileWindow}}">估计易孕窗口：{{fertileWindow}}</view>
     <view class="model-note">窗口仅为日期估计，未标记的日期不代表安全期，不能用于避孕判断。</view>
     <view class="upcoming-section" wx:if="{{upcomingPeriods.length > 0}}">
-      <view class="upcoming-title">按当前记录外推的候选经期</view>
-      <view class="upcoming-list"><view class="upcoming-item" wx:for="{{upcomingPeriods}}" wx:key="start"><view class="upcoming-dot"></view><text class="upcoming-date">{{item.start}} ~ {{item.end}}</text></view></view>
+      <view class="upcoming-title">接下来的预计经期（越往后越不确定，只列最近 3 次）</view>
+      <view class="upcoming-list"><view class="upcoming-item" wx:for="{{upcomingPeriods}}" wx:key="start"><view class="upcoming-dot"></view><text class="upcoming-date">{{item.start}} ~ {{item.end}}</text><text class="upcoming-range" wx:if="{{item.range}}">开始日可能在 {{item.range}}</text></view></view>
     </view>
   </view>
   <view class="section-card">

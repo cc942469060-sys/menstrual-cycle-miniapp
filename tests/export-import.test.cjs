@@ -61,7 +61,7 @@ test('a failed file write or a WeChat version without file sharing ends with a c
   assert.match(e.wx.toasts.at(-1).title, /写入失败/);
   e.wx.shareFileMessage = undefined;
   e.p.exportToChat();
-  assert.match(e.wx.toasts.at(-1).title, /不能发送文件/);
+  assert.match(e.wx.toasts.at(-1).title, /版本过低/);
 });
 
 // ---- Import ----

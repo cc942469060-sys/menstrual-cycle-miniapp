@@ -153,3 +153,25 @@ test('the template locks page scrolling under dialogs and the pending start outr
     isUnreviewed: true, isFertile: true, isPending: true }).split(' ').concat(['period-mid']));
   for (const name of classes) assert(wxss.includes(`.${name}`), `.${name} has a style`);
 });
+
+// ---- Accessibility ----
+
+test('calendar days carry screen-reader text, and fertile days a mark that is not just colour', () => {
+  const state = stateWith(['2026-06-10', '2026-07-08', '2026-08-05', '2026-09-02'].map(start => record(start)));
+  const e = page(state, { today: '2026-09-10T12:00:00' });
+  const cell = date => e.p.data.calendarGrid.find(c => c.date === date);
+  assert.equal(cell('2026-09-02').label, '9月2日 星期三，经期开始');
+  assert.equal(cell('2026-09-04').label, '9月4日 星期五，经期中');
+  assert.equal(cell('2026-09-06').label, '9月6日 星期日，经期结束');
+  assert.equal(cell('2026-09-10').label, '9月10日 星期四，今天，估计易孕窗口');
+  assert.equal(cell('2026-09-15').label, '9月15日 星期二，估计排卵窗口');
+  assert.equal(cell('2026-09-30').label, '9月30日 星期三，预计经期');
+  assert.equal(cell('2026-10-01').label, '10月1日 星期四，其他月份，预计经期');
+  assert.deepEqual([cell('2026-09-11').fertile, cell('2026-09-11').ovulation], [true, undefined]);
+  assert.deepEqual([cell('2026-09-15').fertile, cell('2026-09-15').ovulation], [undefined, true]);
+  const wxml = fs.readFileSync(path.join(root, 'pages/index/index.wxml'), 'utf8');
+  assert(wxml.includes('aria-label="{{item.label}}"'));
+  assert(wxml.includes('aria-label="上个月"') && wxml.includes('aria-label="下个月"'));
+  assert(wxml.includes('<view class="fertile-bar" wx:if="{{item.fertile}}"></view>'));
+  assert(wxml.includes('swatch-fertile"><view class="fertile-bar"></view>') && wxml.includes('swatch-ovulation"><view class="ovu-dot"></view>'));
+});
