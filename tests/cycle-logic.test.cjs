@@ -1,7 +1,7 @@
 // Regressions for the ongoing-event flow, prediction windows, statistics, gap flags, and backup restore.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { C, S, copy, record, stateWith, storage, page } = require('./helpers.cjs');
+const { C, S, V, copy, record, stateWith, storage, page } = require('./helpers.cjs');
 
 const starts = (first, intervals) => intervals.reduce((list, n) => [...list, C.addDays(list[list.length - 1], n)], [first]);
 const ongoingRecord = start => record(start, 1, { end: null, status: 'ongoing' });
@@ -313,4 +313,41 @@ test('without any backup the user is told so instead of seeing an empty menu', (
   e.p.restoreFromBackup();
   assert.equal(e.wx.sheets.length, 0);
   assert.equal(e.wx.toasts.at(-1).title, '暂无可恢复的备份');
+});
+
+// ---- Far-future predictions and moved events ----
+
+test('only the next three periods are predicted, each with the range its start may fall in', () => {
+  const state = stateWith(starts('2026-05-01', [25, 32, 28, 30]).map(start => record(start)));
+  const r = C.computePredictions(state, '2026-09-03');
+  // Intervals 25–32 (mean 29) after the last start on 08-24.
+  assert.deepEqual(r.upcomingPeriods.map(p => p.start), ['2026-09-22', '2026-10-21', '2026-11-19']);
+  assert.deepEqual([r.upcomingPeriods[0].earliestStart, r.upcomingPeriods[0].latestStart], ['2026-09-18', '2026-09-25']);
+  assert.equal(r.predictedDates.at(-1), '2026-11-23');
+  assert.equal(V.buildView(state, r, [], '2026-09-03').upcomingPeriods[0].range, '2026-09-18 ~ 2026-09-25');
+  const manual = C.computePredictions(stateWith(state.periods, { predictionMode: 'manual', manualCycleLength: 29, manualPeriodLength: 5 }), '2026-09-03');
+  assert(manual.upcomingPeriods.every(p => p.earliestStart === p.latestStart), 'fixed manual parameters have no range');
+});
+
+test('moving an event away keeps its missing-record flag on the interval it leaves', () => {
+  const e = page(stateWith([record('2026-06-01'), record('2026-06-29', 5, { excludeGap: true }), record('2026-07-27'), record('2026-08-24')]));
+  e.p.openEditor('p-2026-06-29');
+  assert.equal(e.p.data.editorExcludeGap, true);
+  e.p.onEditorStartChange({ detail: { value: '2026-09-21' } });
+  assert.equal(e.p.data.editorEnd, '2026-09-21', 'an end before the new start moves with it');
+  assert.equal(e.p.data.editorExcludeGap, false, 'after a different earlier event the answer starts unset');
+  e.p.onEditorEndChange({ detail: { value: '2026-09-25' } });
+  e.p.saveEditor();
+  assert.equal(e.wx.toasts.at(-1).title, '已保存，漏录标记转到 07-27');
+  assert.deepEqual(excluded(e), ['2026-06-01->2026-07-27']);
+});
+
+test('the missing-record switch only applies when an earlier event exists', () => {
+  const e = page(stateWith([record('2026-08-01', 5, { excludeGap: true }), record('2026-08-29')]));
+  e.p.openEditor('p-2026-08-01');
+  assert.equal(e.p.data.editorHasPrevious, false);
+  e.p.saveEditor();
+  assert.equal(e.p._state.periods.find(p => p.id === 'p-2026-08-01').excludeGap, false, 'a flag with no interval before it is dropped');
+  e.p.openEditor('p-2026-08-29');
+  assert.equal(e.p.data.editorHasPrevious, true);
 });

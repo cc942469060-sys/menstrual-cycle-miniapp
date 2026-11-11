@@ -161,6 +161,14 @@
   background: #3D82D9;
   margin-top: 2rpx;
 }
+/* Fertile days that are not ovulation days get a bar, so the meaning does not rely on colour. */
+.fertile-bar {
+  width: 24rpx;
+  height: 6rpx;
+  border-radius: 3rpx;
+  background: #2E7D4A;
+  margin-top: 4rpx;
+}
 
 .review-tag { font-size: 18rpx; color: #7A5C10; position: absolute; bottom: 2rpx; }
 
@@ -260,10 +268,13 @@
   margin-right: 10rpx;
 }
 .swatch-period    { background: #FF9EAF; }
-.swatch-ovulation { background: #3D82D9; }
+.swatch-ovulation { background: #fff; border: 2rpx solid #C9DBF3; }
 .swatch-predicted { background: #FFF5F7; border: 2rpx dashed #E8738A; }
 .swatch-review    { background: #FFF4CD; }
 .swatch-fertile   { background: #D3EFD9; }
+/* The legend shows the same dot and bar as the calendar. */
+.swatch-ovulation, .swatch-fertile { display: flex; align-items: center; justify-content: center; box-sizing: border-box; }
+.legend-swatch .ovu-dot, .legend-swatch .fertile-bar { margin-top: 0; }
 
 /* ==================== 统计面板 ==================== */
 .stats-grid {
@@ -309,13 +320,18 @@
 }
 .upcoming-list {
   display: flex;
-  flex-wrap: wrap;
-  gap: 12rpx 24rpx;
+  flex-direction: column;
+  gap: 12rpx;
 }
 .upcoming-item {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8rpx;
+}
+.upcoming-range {
+  font-size: 22rpx;
+  color: #707070;
 }
 .upcoming-dot {
   width: 12rpx;

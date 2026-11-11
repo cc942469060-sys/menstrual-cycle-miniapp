@@ -38,10 +38,29 @@ function cellClass(cell) {
   return classes.join(' ');
 }
 
+// What a screen reader announces for a day, since colours and small marks carry the meaning.
+function cellLabel(cell) {
+  const [, month, day] = cell.date.split('-').map(Number);
+  const parts = [`${month}月${day}日 星期${WEEKDAY_LABELS[C.parseDate(cell.date).getUTCDay()]}`];
+  if (cell.isToday) parts.push('今天');
+  if (!cell.isCurrentMonth) parts.push('其他月份');
+  if (cell.isPeriodStart) parts.push('经期开始');
+  if (cell.isPeriodEnd) parts.push('经期结束');
+  if (cell.isMarked && !cell.isPeriodStart && !cell.isPeriodEnd) parts.push('经期中');
+  if (cell.isUnreviewed) parts.push('旧记录待核对');
+  if (cell.isPending) parts.push('已选为开始日');
+  if (cell.isPredicted) parts.push('预计经期');
+  if (cell.isOvulation) parts.push('估计排卵窗口');
+  else if (cell.isFertile) parts.push('估计易孕窗口');
+  return parts.join('，');
+}
+
 // Template cells carry only what WXML reads; flags that are false are left out.
 function viewCell(cell) {
-  const view = { date: cell.date, day: cell.day, cls: cellClass(cell) };
+  const view = { date: cell.date, day: cell.day, cls: cellClass(cell), label: cellLabel(cell) };
+  // Ovulation days show a dot; other fertile days a bar, so neither depends on colour alone.
   if (cell.isOvulation) view.ovulation = true;
+  else if (cell.isFertile) view.fertile = true;
   if (cell.isPeriodStart) view.start = true;
   if (cell.isPeriodEnd) view.end = true;
   if (cell.isUnreviewed) view.review = true;
@@ -118,7 +137,8 @@ function buildView(state, model, grid, today) {
     nextPeriodStart: model.nextPeriodStart, expectedWindowStart: model.expectedWindowStart, expectedWindowEnd: model.expectedWindowEnd,
     modelSource: model.modelSource, predictionMessage: model.predictionMessage,
     ovulationWindow: model.ovulationWindow, fertileWindow: model.fertileWindow,
-    upcomingPeriods: model.upcomingPeriods.map(p => ({ start: p.start, end: p.end })),
+    upcomingPeriods: model.upcomingPeriods.map(p => ({ start: p.start, end: p.end,
+      range: p.earliestStart !== p.latestStart ? `${p.earliestStart} ~ ${p.latestStart}` : '' })),
     recordedIntervalText: intervalText(model), predictionMode: state.preferences.predictionMode,
     settingCycleLength: base.cycle, settingPeriodLength: base.period, ...pickerIndexes(base.cycle, base.period),
   };
@@ -149,4 +169,4 @@ function repairText(repair) {
 }
 
 module.exports = { CYCLE_PICK_MIN, CYCLE_PICK_MAX, PERIOD_PICK_MAX, CYCLE_OPTIONS, PERIOD_OPTIONS, manualBase, pickerIndexes, cellClass,
-  viewCell, weekdays, intervalText, describeStatus, buildRows, buildView, diffData, repairText };
+  cellLabel, viewCell, weekdays, intervalText, describeStatus, buildRows, buildView, diffData, repairText };

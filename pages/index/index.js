@@ -19,7 +19,7 @@ Page({
     predictionMode: 'auto', settingCycleLength: 28, settingPeriodLength: 5, cycleIndex: 13, periodIndex: 4,
     cycleOptions: V.CYCLE_OPTIONS, periodOptions: V.PERIOD_OPTIONS,
     showSetup: false, ...setupPickerData(28, 5),
-    editorVisible: false, editorId: '', editorStart: '', editorEnd: '', editorOngoing: false, editorExcludeGap: false,
+    editorVisible: false, editorId: '', editorStart: '', editorEnd: '', editorOngoing: false, editorExcludeGap: false, editorHasPrevious: false,
   },
 
   onLoad() {
@@ -212,9 +212,14 @@ Page({
   saveEvent(input) {
     if (!this.canWrite()) return;
     const today = C.formatDate(new Date());
-    if (!C.isDate(input.start) || input.start > today || (!input.ongoing && (!C.isDate(input.end) || input.end > today || input.end < input.start))) {
-      this.notify('请填写有效的实际日期，结束日不能早于开始日或晚于今天'); return;
-    }
+    // Toasts show at most two lines, so each problem gets its own short message.
+    let problem = '';
+    if (!C.isDate(input.start)) problem = '请选择有效的开始日';
+    else if (input.start > today) problem = '开始日不能晚于今天';
+    else if (!input.ongoing && !C.isDate(input.end)) problem = '请选择有效的结束日';
+    else if (!input.ongoing && input.end > today) problem = '结束日不能晚于今天';
+    else if (!input.ongoing && input.end < input.start) problem = '结束日不能早于开始日';
+    if (problem) { this.notify(problem); return; }
     const end = input.ongoing ? null : input.end;
     const collision = this._state.periods.some(p => p.id !== input.id && input.start <= C.effectiveEnd(p, today) && (end || today) >= p.start);
     if (collision) { this.notify('与已有记录重叠，请先编辑或核对原记录'); return; }
@@ -226,7 +231,10 @@ Page({
       if (input.id) next.periods = next.periods.map(p => p.id === input.id ? record : p);
       else next.periods.push(record);
       if (input.fromDraft) next.draft = null;
-      const finish = () => { if (this.commit(next, '记录已保存')) this.setData({ editorVisible: false }); };
+      const left = C.findLeftGap(this._state.periods, next.periods, record.id);
+      if (left) next.periods.forEach(p => { if (p.id === left.id) p.excludeGap = true; });
+      const message = left ? `已保存，漏录标记转到 ${left.start.slice(5)}` : '记录已保存';
+      const finish = () => { if (this.commit(next, message)) this.setData({ editorVisible: false }); };
       const split = C.findSplitGap(this._state.periods, next.periods, record.id);
       if (!split) { finish(); return; }
       this.askSplitGap(split, (before, after) => {
@@ -260,22 +268,41 @@ Page({
     if (id && !hit) return;
     const today = C.formatDate(new Date());
     const start = hit ? hit.start : (this._state.draft ? this._state.draft.start : today);
+    const previous = this.earlierEvent(start, hit ? hit.id : '');
     this._editorFromDraft = !hit && !!this._state.draft;
-    this.setData({ editorVisible: true, editorId: hit ? hit.id : '', editorStart: start,
+    this._editorPreviousId = previous ? previous.id : '';
+    this.setData({ editorVisible: true, editorId: hit ? hit.id : '', editorStart: start, editorHasPrevious: !!previous,
       editorEnd: hit ? (hit.end || today) : start, editorOngoing: !!hit && hit.status === 'ongoing', editorExcludeGap: !!hit && hit.excludeGap });
+  },
+
+  // The missing-record switch describes the interval after the latest earlier event, ignoring the one edited.
+  earlierEvent(start, id) {
+    return this._state.periods.filter(p => p.status !== 'needsReview' && p.id !== id && p.start < start)
+      .sort((a, b) => b.start.localeCompare(a.start))[0] || null;
   },
 
   addRecord() { this.openEditor(''); },
   onRecordTap(event) { this.openEditor(event.currentTarget.dataset.id); },
   closeEditor() { this.setData({ editorVisible: false }); },
   stopTap() {},
-  onEditorStartChange(event) { this.setData({ editorStart: event.detail.value }); },
+  onEditorStartChange(event) {
+    const start = event.detail.value;
+    const previous = this.earlierEvent(start, this.data.editorId);
+    // An end before the new start moves with it, so the range stays valid.
+    const patch = { editorStart: start, editorEnd: this.data.editorEnd < start ? start : this.data.editorEnd, editorHasPrevious: !!previous };
+    // After a different earlier event the interval is a different one, so its answer starts unset.
+    if ((previous ? previous.id : '') !== this._editorPreviousId) {
+      patch.editorExcludeGap = false;
+      this._editorPreviousId = previous ? previous.id : '';
+    }
+    this.setData(patch);
+  },
   onEditorEndChange(event) { this.setData({ editorEnd: event.detail.value }); },
   onEditorOngoingChange(event) { this.setData({ editorOngoing: event.detail.value }); },
   onEditorGapChange(event) { this.setData({ editorExcludeGap: event.detail.value }); },
   saveEditor() {
-    this.saveEvent({ id: this.data.editorId, start: this.data.editorStart, end: this.data.editorEnd,
-      ongoing: this.data.editorOngoing, excludeGap: this.data.editorExcludeGap, fromDraft: this._editorFromDraft });
+    this.saveEvent({ id: this.data.editorId, start: this.data.editorStart, end: this.data.editorEnd, ongoing: this.data.editorOngoing,
+      excludeGap: this.data.editorHasPrevious && this.data.editorExcludeGap, fromDraft: this._editorFromDraft });
   },
 
   deleteEditorRecord() {
@@ -351,11 +378,11 @@ Page({
     if (!this.canWrite()) return;
     const result = S.buildExport(this._state, C.formatDate(new Date()));
     if (!result.ok) { this.notify(result.message); return; }
-    if (typeof wx.shareFileMessage !== 'function') { this.notify('当前微信版本不能发送文件，请改用复制备份文本'); return; }
+    if (typeof wx.shareFileMessage !== 'function') { this.notify('微信版本过低，请改用复制备份文本'); return; }
     // A fixed name is overwritten by each export, so copies of the records do not pile up.
     const filePath = `${wx.env.USER_DATA_PATH}/cycle-backup.json`;
     try { wx.getFileSystemManager().writeFileSync(filePath, result.text, 'utf8'); }
-    catch (error) { this.notify('备份文件写入失败，请重试或改用复制备份文本'); return; }
+    catch (error) { this.notify('写入失败，请重试或改用复制文本'); return; }
     wx.shareFileMessage({ filePath, fileName: result.fileName,
       success: () => this.notify(`已发送 ${result.count} 条记录的备份`), fail: error => this.reportFailure(error, '发送备份文件') });
   },

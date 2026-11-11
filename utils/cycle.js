@@ -4,7 +4,9 @@ const CYCLE_MAX = 180;
 const PERIOD_MAX = 180;
 // Statistics and the prediction model share the same recent sample window.
 const MODEL_WINDOW = 12;
-// Estimated fertile windows are only projected this many cycles ahead.
+// Predicted periods and estimated fertile windows are only projected this many cycles ahead;
+// beyond that the uncertainty would make exact calendar dates misleading.
+const PREDICTED_CYCLES = 3;
 const FERTILE_CYCLES = 2;
 // An unfinished event lasting longer than this asks the user to confirm its end.
 const ONGOING_PROMPT_DAYS = 10;
@@ -214,22 +216,21 @@ function computePredictions(state, today) {
     }
   };
   const showWindows = quality === 'regular' && result.predictionStatus !== 'overdue';
-  const maxIterations = Math.ceil(365 / cycleLength) + 2;
   // Retain the first expected date; never silently advance over missing records.
-  for (let i = 1; i <= maxIterations; i++) {
+  for (let i = 1; i <= PREDICTED_CYCLES; i++) {
     const start = addDays(stats.lastPeriodStart, i * cycleLength);
     if (start > endLimit || (i > 1 && (quality !== 'regular' || result.predictionStatus === 'overdue'))) break;
     const end = addDays(start, periodLength - 1);
     addRange(predicted, start, end);
-    const entry = { start, end, ovulationStart: '', ovulationEnd: '', fertileStart: '', fertileEnd: '' };
-    // The observed range widens with the square root of the cycles ahead (exactly min–max for
-    // the next cycle). Further out, windows would merge with each other and with predicted
-    // periods, so they are not projected at all.
+    // The observed range widens with the square root of the cycles ahead (exactly min–max for the
+    // next cycle); it bounds where this start may fall and the fertile window before it.
+    const scale = Math.sqrt(i);
+    const earliestStart = addDays(stats.lastPeriodStart, i * cycleLength - Math.ceil((cycleLength - rangeMin) * scale));
+    const latestStart = addDays(stats.lastPeriodStart, i * cycleLength + Math.ceil((rangeMax - cycleLength) * scale));
+    const entry = { start, end, earliestStart, latestStart, ovulationStart: '', ovulationEnd: '', fertileStart: '', fertileEnd: '' };
+    // Windows further out would merge with each other and with predicted periods.
     if (showWindows && i <= FERTILE_CYCLES) {
-      const scale = Math.sqrt(i);
-      const earliest = i * cycleLength - Math.ceil((cycleLength - rangeMin) * scale);
-      const latest = i * cycleLength + Math.ceil((rangeMax - cycleLength) * scale);
-      const window = getFertileWindow(addDays(stats.lastPeriodStart, earliest), addDays(stats.lastPeriodStart, latest));
+      const window = getFertileWindow(earliestStart, latestStart);
       Object.assign(entry, window);
       addRange(ovu, window.ovulationStart, window.ovulationEnd);
       addRange(fertile, window.fertileStart, window.fertileEnd);
@@ -287,6 +288,21 @@ function findSplitGap(previousPeriods, nextPeriods, id) {
   return { previous: after[index - 1], record: after[index], following };
 }
 
-module.exports = { DAY_MS, CYCLE_MIN, CYCLE_MAX, PERIOD_MAX, MODEL_WINDOW, FERTILE_CYCLES, ONGOING_PROMPT_DAYS, parseDate, formatDate, formatUTC,
+// When an edit moves an event past its neighbours, the interval it leaves merges into the next one,
+// so a missing-record flag on the moved event belongs to that next event, as on deletion.
+function findLeftGap(previousPeriods, nextPeriods, id) {
+  const confirmed = list => list.filter(p => p.status !== 'needsReview').sort((a, b) => a.start.localeCompare(b.start));
+  const before = confirmed(previousPeriods);
+  const index = before.findIndex(p => p.id === id);
+  if (index < 1 || index > before.length - 2 || !before[index].excludeGap || before[index + 1].excludeGap) return null;
+  const following = before[index + 1];
+  const after = confirmed(nextPeriods);
+  const followingIndex = after.findIndex(p => p.id === following.id);
+  // Still directly before its old follower: the event did not leave the interval.
+  if (followingIndex > 0 && after[followingIndex - 1].id === id) return null;
+  return following;
+}
+
+module.exports = { DAY_MS, CYCLE_MIN, CYCLE_MAX, PERIOD_MAX, MODEL_WINDOW, PREDICTED_CYCLES, FERTILE_CYCLES, ONGOING_PROMPT_DAYS, parseDate, formatDate, formatUTC,
   isDate, dateNumber, daysBetween, addDays, getDaysInMonth, getFirstDayOfWeek, extractPeriods, median, effectiveEnd, calculateStats,
-  predictNextPeriod, getFertileWindow, computePredictions, generateCalendarGrid, findSplitGap };
+  predictNextPeriod, getFertileWindow, computePredictions, generateCalendarGrid, findSplitGap, findLeftGap };

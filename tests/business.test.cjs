@@ -164,7 +164,7 @@ test('P2-12 duplicate IDs, wrong status, and overlapping stored actual events ar
 });
 test('P2-13 regular observations produce windows for the next two projected cycles only',()=>{
   const state=stateWith(['2026-06-10','2026-07-08','2026-08-05','2026-09-02'].map(start=>record(start)));
-  const r=C.computePredictions(state,'2026-09-10');assert.equal(r.quality,'regular');assert(r.upcomingPeriods.length>10);
+  const r=C.computePredictions(state,'2026-09-10');assert.equal(r.quality,'regular');assert.deepEqual(r.upcomingPeriods.map(p=>p.start),['2026-09-30','2026-10-28','2026-11-25']);
   assert(r.upcomingPeriods.slice(0,2).every(p=>p.ovulationStart&&p.fertileStart));assert(r.upcomingPeriods.slice(2).every(p=>!p.ovulationStart&&!p.fertileStart));
   const october=C.generateCalendarGrid(2026,10,state.periods,r,null,'2026-09-10');assert(october.some(c=>c.isOvulation));assert(october.some(c=>c.isFertile));
   const november=C.generateCalendarGrid(2026,11,state.periods,r,null,'2026-09-10');assert(!november.some(c=>c.isCurrentMonth&&(c.isOvulation||c.isFertile)));
