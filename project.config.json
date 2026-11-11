@@ -4,7 +4,11 @@
     "ignore": [
       { "type": "folder", "value": "tests" },
       { "type": "folder", "value": ".github" },
+      { "type": "folder", "value": "node_modules" },
       { "type": "file", "value": "package.json" },
+      { "type": "file", "value": "package-lock.json" },
+      { "type": "file", "value": ".prettierrc.json" },
+      { "type": "file", "value": ".prettierignore" },
       { "type": "file", "value": "README.md" }
     ],
     "include": []

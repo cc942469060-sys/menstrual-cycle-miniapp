@@ -3,7 +3,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { C, S, V, copy, record, stateWith, storage, page } = require('./helpers.cjs');
 
-const starts = (first, intervals) => intervals.reduce((list, n) => [...list, C.addDays(list[list.length - 1], n)], [first]);
+const starts = (first, intervals) =>
+  intervals.reduce((list, n) => [...list, C.addDays(list[list.length - 1], n)], [first]);
 const ongoingRecord = start => record(start, 1, { end: null, status: 'ongoing' });
 const excluded = e => e.p._model.excludedIntervals.map(item => `${item.start}->${item.end}`);
 // Picker events carry the index of the chosen option as a string.
@@ -19,9 +20,15 @@ test('an ongoing event is shown on the calendar from its start through today', (
   e.setNow('2026-10-04T09:00:00');
   e.p.renderCalendar();
   const cells = e.p._grid.filter(c => c.date >= '2026-10-01' && c.date <= '2026-10-05');
-  assert.deepEqual(cells.map(c => c.isMarked), [true, true, true, true, false]);
+  assert.deepEqual(
+    cells.map(c => c.isMarked),
+    [true, true, true, true, false],
+  );
   assert.equal(cells[0].isPeriodStart, true);
-  assert.equal(cells.some(c => c.isPeriodEnd), false);
+  assert.equal(
+    cells.some(c => c.isPeriodEnd),
+    false,
+  );
   assert.equal(e.p.data.ongoingStart, '2026-10-01');
   assert.equal(e.p._model.ongoingDay, 4);
   assert.equal(e.p._model.predictionStatusText, '经期第 4 天（进行中）');
@@ -39,7 +46,10 @@ test('tapping a later day of an ongoing event ends it there instead of creating 
   e.tap('2026-10-03');
   assert.deepEqual(e.wx.sheets.at(-1).itemList, ['设为结束日：10-03（共 3 天）', '编辑这条记录']);
   assert.equal(e.snapshot().draft, null);
-  assert.deepEqual(e.p._state.periods.map(p => [p.id, p.start, p.end, p.status]), [[id, '2026-10-01', '2026-10-03', 'completed']]);
+  assert.deepEqual(
+    e.p._state.periods.map(p => [p.id, p.start, p.end, p.status]),
+    [[id, '2026-10-01', '2026-10-03', 'completed']],
+  );
   assert.equal(e.p.data.typicalPeriodLength, 3);
 });
 
@@ -60,7 +70,10 @@ test('the ongoing tip ends the event today in one tap or opens the editor ready 
   assert.equal(e.p.data.editorEnd, '2026-10-03');
   e.p.closeEditor();
   e.p.endOngoingToday();
-  assert.deepEqual(e.p._state.periods.map(p => [p.end, p.status]), [['2026-10-03', 'completed']]);
+  assert.deepEqual(
+    e.p._state.periods.map(p => [p.end, p.status]),
+    [['2026-10-03', 'completed']],
+  );
   assert.equal(e.p.data.ongoingStart, '');
 });
 
@@ -80,22 +93,40 @@ test('fertile windows stop after two cycles, so no month is fully covered', () =
   const today = '2026-09-03';
   const r = C.computePredictions(state, today);
   assert.equal(r.quality, 'regular');
-  assert.deepEqual(r.upcomingPeriods.map(p => !!p.fertileStart), r.upcomingPeriods.map((p, i) => i < 2));
+  assert.deepEqual(
+    r.upcomingPeriods.map(p => !!p.fertileStart),
+    r.upcomingPeriods.map((p, i) => i < 2),
+  );
   for (let k = 0; k < 12; k++) {
     const year = 2026 + Math.floor((8 + k) / 12);
     const month = ((8 + k) % 12) + 1;
     const days = C.generateCalendarGrid(year, month, state.periods, r, null, today).filter(c => c.isCurrentMonth);
-    assert(days.some(c => !c.isMarked && !c.isPredicted && !c.isFertile && !c.isOvulation), `${year}-${month} is fully marked`);
-    assert(!days.some(c => c.isPredicted && (c.isFertile || c.isOvulation)), `${year}-${month} marks a predicted day as fertile`);
+    assert(
+      days.some(c => !c.isMarked && !c.isPredicted && !c.isFertile && !c.isOvulation),
+      `${year}-${month} is fully marked`,
+    );
+    assert(
+      !days.some(c => c.isPredicted && (c.isFertile || c.isOvulation)),
+      `${year}-${month} marks a predicted day as fertile`,
+    );
   }
 });
 
 test('the second-cycle window widens with the square root of the cycles ahead', () => {
   // Intervals 25–32 (mean 29) after the last start on 08-24: cycle 1 spans day 25–32, cycle 2 day 52–63.
-  const r = C.computePredictions(stateWith(starts('2026-05-01', [25, 32, 28, 30]).map(start => record(start))), '2026-09-03');
+  const r = C.computePredictions(
+    stateWith(starts('2026-05-01', [25, 32, 28, 30]).map(start => record(start))),
+    '2026-09-03',
+  );
   const [first, second] = r.upcomingPeriods;
-  assert.deepEqual([first.ovulationStart, first.ovulationEnd], [C.addDays('2026-08-24', 25 - 16), C.addDays('2026-08-24', 32 - 10)]);
-  assert.deepEqual([second.ovulationStart, second.ovulationEnd], [C.addDays('2026-08-24', 52 - 16), C.addDays('2026-08-24', 63 - 10)]);
+  assert.deepEqual(
+    [first.ovulationStart, first.ovulationEnd],
+    [C.addDays('2026-08-24', 25 - 16), C.addDays('2026-08-24', 32 - 10)],
+  );
+  assert.deepEqual(
+    [second.ovulationStart, second.ovulationEnd],
+    [C.addDays('2026-08-24', 52 - 16), C.addDays('2026-08-24', 63 - 10)],
+  );
 });
 
 test('a predicted period day takes precedence over an overlapping estimated window', () => {
@@ -142,18 +173,34 @@ test('a model whose period is not shorter than the cycle can still be overridden
 });
 
 test('manual mode without any recorded interval does not claim to differ from records', () => {
-  const none = C.computePredictions(stateWith([record('2026-09-20')], { predictionMode: 'manual', manualCycleLength: 30, manualPeriodLength: 5 }), '2026-10-03');
+  const none = C.computePredictions(
+    stateWith([record('2026-09-20')], { predictionMode: 'manual', manualCycleLength: 30, manualPeriodLength: 5 }),
+    '2026-10-03',
+  );
   assert.equal(none.quality, 'limited');
   assert.match(none.predictionMessage, /尚无可比较的记录间隔/);
   assert.doesNotMatch(none.predictionMessage, /与已记录间隔不同/);
-  const differ = C.computePredictions(stateWith([record('2026-08-01'), record('2026-08-29')], { predictionMode: 'manual', manualCycleLength: 35, manualPeriodLength: 5 }), '2026-10-03');
+  const differ = C.computePredictions(
+    stateWith([record('2026-08-01'), record('2026-08-29')], {
+      predictionMode: 'manual',
+      manualCycleLength: 35,
+      manualPeriodLength: 5,
+    }),
+    '2026-10-03',
+  );
   assert.match(differ.predictionMessage, /与已记录间隔不同/);
 });
 
 // ---- Missing-record flags ----
 
-const flagged = () => [record('2026-06-01'), record('2026-06-29'), record('2026-07-27'), record('2026-09-21', 5, { excludeGap: true })];
-const backfill = e => e.p.saveEvent({ id: '', start: '2026-08-24', end: '2026-08-28', ongoing: false, excludeGap: false });
+const flagged = () => [
+  record('2026-06-01'),
+  record('2026-06-29'),
+  record('2026-07-27'),
+  record('2026-09-21', 5, { excludeGap: true }),
+];
+const backfill = e =>
+  e.p.saveEvent({ id: '', start: '2026-08-24', end: '2026-08-28', ongoing: false, excludeGap: false });
 
 test('back-filling a flagged gap asks which part is still missing', () => {
   const e = page(stateWith(flagged()));
@@ -161,14 +208,23 @@ test('back-filling a flagged gap asks which part is still missing', () => {
   backfill(e);
   assert.equal(e.wx.sheets.length, 1);
   assert.match(e.wx.sheets[0].alertText, /2026-09-21/);
-  assert.deepEqual(e.wx.sheets[0].itemList, ['已补齐，都没有漏录', '07-27 ~ 08-24 仍有漏录', '08-24 ~ 09-21 仍有漏录', '两段都仍有漏录']);
+  assert.deepEqual(e.wx.sheets[0].itemList, [
+    '已补齐，都没有漏录',
+    '07-27 ~ 08-24 仍有漏录',
+    '08-24 ~ 09-21 仍有漏录',
+    '两段都仍有漏录',
+  ]);
   assert.deepEqual(copy(e.p._model.cycleLengths), [28, 28, 28, 28]);
   assert.equal(e.p._model.quality, 'regular');
   assert.notEqual(e.p.data.fertileWindow, '');
 });
 
 test('each answer about a split gap flags exactly the chosen intervals', () => {
-  const cases = [[1, ['2026-07-27->2026-08-24']], [2, ['2026-08-24->2026-09-21']], [3, ['2026-07-27->2026-08-24', '2026-08-24->2026-09-21']]];
+  const cases = [
+    [1, ['2026-07-27->2026-08-24']],
+    [2, ['2026-08-24->2026-09-21']],
+    [3, ['2026-07-27->2026-08-24', '2026-08-24->2026-09-21']],
+  ];
   for (const [index, expected] of cases) {
     const e = page(stateWith(flagged()));
     e.wx.options.sheetIndex = index;
@@ -187,7 +243,9 @@ test('dismissing the split-gap question saves nothing and keeps the draft', () =
 });
 
 test('editing a record that already sits between the same neighbours does not ask again', () => {
-  const e = page(stateWith([...flagged().slice(0, 3), record('2026-08-24'), record('2026-09-21', 5, { excludeGap: true })]));
+  const e = page(
+    stateWith([...flagged().slice(0, 3), record('2026-08-24'), record('2026-09-21', 5, { excludeGap: true })]),
+  );
   e.p.openEditor('p-2026-08-24');
   e.p.onEditorEndChange({ detail: { value: '2026-08-27' } });
   e.p.saveEditor();
@@ -196,7 +254,9 @@ test('editing a record that already sits between the same neighbours does not as
 });
 
 test('deleting a record moves its missing-record flag onto the merged interval', () => {
-  const e = page(stateWith([record('2026-06-01'), record('2026-06-29', 5, { excludeGap: true }), record('2026-07-27')]));
+  const e = page(
+    stateWith([record('2026-06-01'), record('2026-06-29', 5, { excludeGap: true }), record('2026-07-27')]),
+  );
   e.p.openEditor('p-2026-06-29');
   e.p.deleteEditorRecord();
   assert.match(e.wx.modals.at(-1).content, /漏录标记会转到 2026-07-27/);
@@ -208,10 +268,14 @@ test('deleting a record moves its missing-record flag onto the merged interval',
 
 test('an interval containing an unreviewed legacy start is not counted as a cycle', () => {
   const raw = { markedDates: [], setupCompleted: true };
-  for (const start of ['2026-06-01', '2026-06-29', '2026-07-27', '2026-08-24']) for (let i = 0; i < 5; i++) raw.markedDates.push(C.addDays(start, i));
+  for (const start of ['2026-06-01', '2026-06-29', '2026-07-27', '2026-08-24'])
+    for (let i = 0; i < 5; i++) raw.markedDates.push(C.addDays(start, i));
   const e = page(raw);
   const ids = e.p._state.periods.map(p => p.id);
-  for (const id of [ids[0], ids[2]]) { e.p.openEditor(id); e.p.saveEditor(); }
+  for (const id of [ids[0], ids[2]]) {
+    e.p.openEditor(id);
+    e.p.saveEditor();
+  }
   assert.deepEqual(copy(e.p._model.cycleLengths), []);
   assert.deepEqual(excluded(e), ['2026-06-01->2026-07-27']);
   assert.equal(e.p._model.excludedIntervals[0].reason, 'review');
@@ -219,14 +283,20 @@ test('an interval containing an unreviewed legacy start is not counted as a cycl
   // The newer 08-24 legacy record is still unreviewed, so the latest confirmed start is not trusted.
   assert.equal(e.p._model.predictionStatus, 'review');
   assert.equal(e.p.data.nextPeriodStart, '');
-  for (const id of [ids[1], ids[3]]) { e.p.openEditor(id); e.p.saveEditor(); }
+  for (const id of [ids[1], ids[3]]) {
+    e.p.openEditor(id);
+    e.p.saveEditor();
+  }
   assert.deepEqual(copy(e.p._model.cycleLengths), [28, 28, 28]);
 });
 
 test('statistics and predictions use the same recent window', () => {
   const periods = [record('2025-01-01', 40)];
   let start = C.addDays('2025-01-01', 60);
-  for (let i = 0; i < 13; i++) { periods.push(record(start)); start = C.addDays(start, 30); }
+  for (let i = 0; i < 13; i++) {
+    periods.push(record(start));
+    start = C.addDays(start, 30);
+  }
   const r = C.computePredictions(stateWith(periods), '2026-03-20');
   assert.equal(r.cycleLengths.length, 13);
   assert.equal(r.cycleSampleCount, 12);
@@ -268,7 +338,10 @@ test('restoring keeps the replaced data restorable, so a restore can be undone',
   assert.deepEqual(wx.values.get(S.KEY), older);
   assert.deepEqual(wx.values.get(S.RESTORE_BACKUP), current);
   // The reset backup now matches the current data, so only the pre-restore copy is offered.
-  assert.deepEqual(S.listBackups(wx, '2026-10-03').map(item => [item.key, item.count]), [[S.RESTORE_BACKUP, 1]]);
+  assert.deepEqual(
+    S.listBackups(wx, '2026-10-03').map(item => [item.key, item.count]),
+    [[S.RESTORE_BACKUP, 1]],
+  );
   assert.equal(S.restore(wx, S.RESTORE_BACKUP, '2026-10-03').ok, true);
   assert.deepEqual(wx.values.get(S.KEY), current);
 });
@@ -278,7 +351,10 @@ test('a legacy backup restores as records awaiting review', () => {
   wx.values.set(S.LEGACY_BACKUP, { markedDates: ['2026-08-01', '2026-08-02', '2026-08-03'] });
   const result = S.restore(wx, S.LEGACY_BACKUP, '2026-10-03');
   assert.equal(result.ok, true);
-  assert.deepEqual(result.state.periods.map(p => [p.start, p.end, p.status]), [['2026-08-01', '2026-08-03', 'needsReview']]);
+  assert.deepEqual(
+    result.state.periods.map(p => [p.start, p.end, p.status]),
+    [['2026-08-01', '2026-08-03', 'needsReview']],
+  );
   assert(result.warnings.length > 0);
 });
 
@@ -321,16 +397,35 @@ test('only the next three periods are predicted, each with the range its start m
   const state = stateWith(starts('2026-05-01', [25, 32, 28, 30]).map(start => record(start)));
   const r = C.computePredictions(state, '2026-09-03');
   // Intervals 25–32 (mean 29) after the last start on 08-24.
-  assert.deepEqual(r.upcomingPeriods.map(p => p.start), ['2026-09-22', '2026-10-21', '2026-11-19']);
-  assert.deepEqual([r.upcomingPeriods[0].earliestStart, r.upcomingPeriods[0].latestStart], ['2026-09-18', '2026-09-25']);
+  assert.deepEqual(
+    r.upcomingPeriods.map(p => p.start),
+    ['2026-09-22', '2026-10-21', '2026-11-19'],
+  );
+  assert.deepEqual(
+    [r.upcomingPeriods[0].earliestStart, r.upcomingPeriods[0].latestStart],
+    ['2026-09-18', '2026-09-25'],
+  );
   assert.equal(r.predictedDates.at(-1), '2026-11-23');
   assert.equal(V.buildView(state, r, [], '2026-09-03').upcomingPeriods[0].range, '2026-09-18 ~ 2026-09-25');
-  const manual = C.computePredictions(stateWith(state.periods, { predictionMode: 'manual', manualCycleLength: 29, manualPeriodLength: 5 }), '2026-09-03');
-  assert(manual.upcomingPeriods.every(p => p.earliestStart === p.latestStart), 'fixed manual parameters have no range');
+  const manual = C.computePredictions(
+    stateWith(state.periods, { predictionMode: 'manual', manualCycleLength: 29, manualPeriodLength: 5 }),
+    '2026-09-03',
+  );
+  assert(
+    manual.upcomingPeriods.every(p => p.earliestStart === p.latestStart),
+    'fixed manual parameters have no range',
+  );
 });
 
 test('moving an event away keeps its missing-record flag on the interval it leaves', () => {
-  const e = page(stateWith([record('2026-06-01'), record('2026-06-29', 5, { excludeGap: true }), record('2026-07-27'), record('2026-08-24')]));
+  const e = page(
+    stateWith([
+      record('2026-06-01'),
+      record('2026-06-29', 5, { excludeGap: true }),
+      record('2026-07-27'),
+      record('2026-08-24'),
+    ]),
+  );
   e.p.openEditor('p-2026-06-29');
   assert.equal(e.p.data.editorExcludeGap, true);
   e.p.onEditorStartChange({ detail: { value: '2026-09-21' } });
@@ -347,7 +442,11 @@ test('the missing-record switch only applies when an earlier event exists', () =
   e.p.openEditor('p-2026-08-01');
   assert.equal(e.p.data.editorHasPrevious, false);
   e.p.saveEditor();
-  assert.equal(e.p._state.periods.find(p => p.id === 'p-2026-08-01').excludeGap, false, 'a flag with no interval before it is dropped');
+  assert.equal(
+    e.p._state.periods.find(p => p.id === 'p-2026-08-01').excludeGap,
+    false,
+    'a flag with no interval before it is dropped',
+  );
   e.p.openEditor('p-2026-08-29');
   assert.equal(e.p.data.editorHasPrevious, true);
 });

@@ -1,0 +1,7 @@
+# Maintained by the WeChat developer tools or npm.
+project.config.json
+project.private.config.json
+package-lock.json
+# Prettier has no WXML parser; prose in Markdown is left as written.
+*.wxml
+*.md

@@ -21,7 +21,10 @@ function manualBase(model) {
 }
 
 function pickerIndexes(cycle, period) {
-  return { cycleIndex: clamp(cycle, CYCLE_PICK_MIN, CYCLE_PICK_MAX) - CYCLE_PICK_MIN, periodIndex: clamp(period, 1, PERIOD_PICK_MAX) - 1 };
+  return {
+    cycleIndex: clamp(cycle, CYCLE_PICK_MIN, CYCLE_PICK_MAX) - CYCLE_PICK_MIN,
+    periodIndex: clamp(period, 1, PERIOD_PICK_MAX) - 1,
+  };
 }
 
 function cellClass(cell) {
@@ -77,7 +80,9 @@ function weekdays(weekStartsOn) {
 function intervalText(model) {
   const gapCount = model.excludedIntervals.filter(item => item.reason === 'gap').length;
   const spanCount = model.excludedIntervals.length - gapCount;
-  const excluded = [gapCount ? `${gapCount} 个已标记漏录` : '', spanCount ? `${spanCount} 个跨越待核对记录` : ''].filter(Boolean).join('、');
+  const excluded = [gapCount ? `${gapCount} 个已标记漏录` : '', spanCount ? `${spanCount} 个跨越待核对记录` : '']
+    .filter(Boolean)
+    .join('、');
   const window = model.cycleLengths.length > C.MODEL_WINDOW ? `；平均只取最近 ${C.MODEL_WINDOW} 个` : '';
   return `共 ${model.recordedIntervals.length} 个开始日间隔${excluded ? `；${excluded}，不参与周期平均` : ''}${window}。`;
 }
@@ -89,36 +94,79 @@ function describeStatus(model, today) {
   const range = `${model.expectedWindowStart} ~ ${model.expectedWindowEnd}`;
   switch (model.predictionStatus) {
     case 'ongoing':
-      return { tone: 'period', title: `经期第 ${model.ongoingDay} 天`,
-        detail: model.ongoingLong ? `从 ${model.ongoingStart} 开始，持续时间较长；如果已经结束，请确认结束日。` : `从 ${model.ongoingStart} 开始，结束后点日历上的结束日即可。` };
+      return {
+        tone: 'period',
+        title: `经期第 ${model.ongoingDay} 天`,
+        detail: model.ongoingLong
+          ? `从 ${model.ongoingStart} 开始，持续时间较长；如果已经结束，请确认结束日。`
+          : `从 ${model.ongoingStart} 开始，结束后点日历上的结束日即可。`,
+      };
     case 'due':
       return { tone: 'alert', title: '预计今天开始', detail: `如果已经开始，点日历上的今天记录${rough}。` };
     case 'overdue':
-      return { tone: 'alert', title: `比预计晚了 ${model.overdueDays} 天`, detail: `预计 ${model.nextPeriodStart || model.expectedWindowEnd}，还没有记录开始；如果已经开始，请补录。` };
+      return {
+        tone: 'alert',
+        title: `比预计晚了 ${model.overdueDays} 天`,
+        detail: `预计 ${model.nextPeriodStart || model.expectedWindowEnd}，还没有记录开始；如果已经开始，请补录。`,
+      };
     case 'upcoming':
-      if (model.nextPeriodStart) return { tone: 'normal', title: `距下次经期约 ${until(model.nextPeriodStart)} 天`, detail: `预计 ${model.nextPeriodStart} 开始${rough}。` };
+      if (model.nextPeriodStart)
+        return {
+          tone: 'normal',
+          title: `距下次经期约 ${until(model.nextPeriodStart)} 天`,
+          detail: `预计 ${model.nextPeriodStart} 开始${rough}。`,
+        };
       if (model.expectedWindowStart > today) {
-        return { tone: 'normal', title: `下次经期约在 ${until(model.expectedWindowStart)}～${until(model.expectedWindowEnd)} 天后`, detail: `记录间隔波动较大，可能范围 ${range}。` };
+        return {
+          tone: 'normal',
+          title: `下次经期约在 ${until(model.expectedWindowStart)}～${until(model.expectedWindowEnd)} 天后`,
+          detail: `记录间隔波动较大，可能范围 ${range}。`,
+        };
       }
-      return { tone: 'normal', title: `下次经期可能在 ${until(model.expectedWindowEnd)} 天内开始`, detail: `记录间隔波动较大，可能范围 ${range}。` };
+      return {
+        tone: 'normal',
+        title: `下次经期可能在 ${until(model.expectedWindowEnd)} 天内开始`,
+        detail: `记录间隔波动较大，可能范围 ${range}。`,
+      };
     case 'review':
-      return { tone: 'alert', title: model.predictionStatusText, detail: '点日历上标着“核对”的日期或记录列表中的记录，确认实际日期后再预测。' };
+      return {
+        tone: 'alert',
+        title: model.predictionStatusText,
+        detail: '点日历上标着“核对”的日期或记录列表中的记录，确认实际日期后再预测。',
+      };
     case 'unavailable':
       return { tone: 'normal', title: '暂不提供日期预测', detail: '当前记录不适合固定周期模型，真实记录已保留。' };
     default:
-      return { tone: 'normal', title: '还没有经期记录', detail: '点日历选择实际开始日和结束日，或使用下方的“添加 / 补录”。' };
+      return {
+        tone: 'normal',
+        title: '还没有经期记录',
+        detail: '点日历选择实际开始日和结束日，或使用下方的“添加 / 补录”。',
+      };
   }
 }
 
 function buildRows(periods, today) {
-  const periodRows = periods.slice().reverse().slice(0, ROW_LIMIT).map(p => {
-    const datesAhead = p.start > today || (p.end && p.end > today);
-    const statusText = datesAhead ? '日期待核对' : ({ needsReview: '待核对', ongoing: '进行中' }[p.status] || '已确认');
-    let durationText = '结束日未确认';
-    if (p.end) durationText = `${C.daysBetween(p.start, p.end) + 1} 天`;
-    else if (p.status === 'ongoing' && p.start <= today) durationText = `进行中 · 第 ${C.daysBetween(p.start, today) + 1} 天`;
-    return { id: p.id, start: p.start, end: p.end, status: p.status, excludeGap: p.excludeGap, statusText, durationText };
-  });
+  const periodRows = periods
+    .slice()
+    .reverse()
+    .slice(0, ROW_LIMIT)
+    .map(p => {
+      const datesAhead = p.start > today || (p.end && p.end > today);
+      const statusText = datesAhead ? '日期待核对' : { needsReview: '待核对', ongoing: '进行中' }[p.status] || '已确认';
+      let durationText = '结束日未确认';
+      if (p.end) durationText = `${C.daysBetween(p.start, p.end) + 1} 天`;
+      else if (p.status === 'ongoing' && p.start <= today)
+        durationText = `进行中 · 第 ${C.daysBetween(p.start, today) + 1} 天`;
+      return {
+        id: p.id,
+        start: p.start,
+        end: p.end,
+        status: p.status,
+        excludeGap: p.excludeGap,
+        statusText,
+        durationText,
+      };
+    });
   return { periodRows, hasMoreRecords: periods.length > ROW_LIMIT };
 }
 
@@ -128,19 +176,41 @@ function buildView(state, model, grid, today) {
   const base = manualBase(model);
   const weekStartsOn = state.preferences.weekStartsOn || 0;
   return {
-    today, todayDateStr: today.slice(5), weekStartsOn, weekdays: weekdays(weekStartsOn), calendarGrid: grid.map(viewCell),
-    ...buildRows(state.periods, today), pendingStart: state.draft ? state.draft.start : '',
-    statusTitle: status.title, statusDetail: status.detail, statusTone: status.tone, ongoingStart: model.ongoingStart,
-    avgCycleLength: model.avgCycleLength, typicalPeriodLength: model.typicalPeriodLength,
-    cycleSampleCount: model.cycleSampleCount, periodSampleCount: model.periodSampleCount,
-    periodCount: model.periodCount, reviewCount: model.reviewCount, lastPeriodStart: model.lastPeriodStart,
-    nextPeriodStart: model.nextPeriodStart, expectedWindowStart: model.expectedWindowStart, expectedWindowEnd: model.expectedWindowEnd,
-    modelSource: model.modelSource, predictionMessage: model.predictionMessage,
-    ovulationWindow: model.ovulationWindow, fertileWindow: model.fertileWindow,
-    upcomingPeriods: model.upcomingPeriods.map(p => ({ start: p.start, end: p.end,
-      range: p.earliestStart !== p.latestStart ? `${p.earliestStart} ~ ${p.latestStart}` : '' })),
-    recordedIntervalText: intervalText(model), predictionMode: state.preferences.predictionMode,
-    settingCycleLength: base.cycle, settingPeriodLength: base.period, ...pickerIndexes(base.cycle, base.period),
+    today,
+    todayDateStr: today.slice(5),
+    weekStartsOn,
+    weekdays: weekdays(weekStartsOn),
+    calendarGrid: grid.map(viewCell),
+    ...buildRows(state.periods, today),
+    pendingStart: state.draft ? state.draft.start : '',
+    statusTitle: status.title,
+    statusDetail: status.detail,
+    statusTone: status.tone,
+    ongoingStart: model.ongoingStart,
+    avgCycleLength: model.avgCycleLength,
+    typicalPeriodLength: model.typicalPeriodLength,
+    cycleSampleCount: model.cycleSampleCount,
+    periodSampleCount: model.periodSampleCount,
+    periodCount: model.periodCount,
+    reviewCount: model.reviewCount,
+    lastPeriodStart: model.lastPeriodStart,
+    nextPeriodStart: model.nextPeriodStart,
+    expectedWindowStart: model.expectedWindowStart,
+    expectedWindowEnd: model.expectedWindowEnd,
+    modelSource: model.modelSource,
+    predictionMessage: model.predictionMessage,
+    ovulationWindow: model.ovulationWindow,
+    fertileWindow: model.fertileWindow,
+    upcomingPeriods: model.upcomingPeriods.map(p => ({
+      start: p.start,
+      end: p.end,
+      range: p.earliestStart !== p.latestStart ? `${p.earliestStart} ~ ${p.latestStart}` : '',
+    })),
+    recordedIntervalText: intervalText(model),
+    predictionMode: state.preferences.predictionMode,
+    settingCycleLength: base.cycle,
+    settingPeriodLength: base.period,
+    ...pickerIndexes(base.cycle, base.period),
   };
 }
 
@@ -151,8 +221,16 @@ function diffData(previous, next) {
   Object.keys(next).forEach(key => {
     const before = previous ? previous[key] : undefined;
     const after = next[key];
-    if (Array.isArray(before) && Array.isArray(after) && before.length === after.length && after.length && typeof after[0] === 'object') {
-      after.forEach((item, index) => { if (JSON.stringify(item) !== JSON.stringify(before[index])) patch[`${key}[${index}]`] = item; });
+    if (
+      Array.isArray(before) &&
+      Array.isArray(after) &&
+      before.length === after.length &&
+      after.length &&
+      typeof after[0] === 'object'
+    ) {
+      after.forEach((item, index) => {
+        if (JSON.stringify(item) !== JSON.stringify(before[index])) patch[`${key}[${index}]`] = item;
+      });
     } else if (JSON.stringify(before) !== JSON.stringify(after)) {
       patch[key] = after;
     }
@@ -168,5 +246,22 @@ function repairText(repair) {
   return `可以${parts.length ? parts.join('、') : '修正格式问题'}后继续使用其余记录；修复前会完整备份原数据。`;
 }
 
-module.exports = { CYCLE_PICK_MIN, CYCLE_PICK_MAX, PERIOD_PICK_MAX, CYCLE_OPTIONS, PERIOD_OPTIONS, manualBase, pickerIndexes, cellClass,
-  cellLabel, viewCell, weekdays, intervalText, describeStatus, buildRows, buildView, diffData, repairText };
+module.exports = {
+  CYCLE_PICK_MIN,
+  CYCLE_PICK_MAX,
+  PERIOD_PICK_MAX,
+  CYCLE_OPTIONS,
+  PERIOD_OPTIONS,
+  manualBase,
+  pickerIndexes,
+  cellClass,
+  cellLabel,
+  viewCell,
+  weekdays,
+  intervalText,
+  describeStatus,
+  buildRows,
+  buildView,
+  diffData,
+  repairText,
+};

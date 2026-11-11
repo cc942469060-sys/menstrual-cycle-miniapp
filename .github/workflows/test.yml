@@ -1,5 +1,5 @@
-# Runs the regression tests for every pull request and every push to main.
-# The tests use only Node built-ins, so there is nothing to install.
+# Runs the regression tests and the formatting check for every pull request and every push to main.
+# The tests use only Node built-ins; npm ci installs the pinned formatter from package-lock.json.
 name: test
 
 on:
@@ -15,4 +15,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+      - run: npm ci
       - run: npm test
+      - run: npm run format:check

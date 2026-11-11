@@ -1,7 +1,5 @@
 {
-  "pages": [
-    "pages/index/index"
-  ],
+  "pages": ["pages/index/index"],
   "window": {
     "navigationBarTitleText": "经期助手",
     "navigationBarBackgroundColor": "#FF6B8A",

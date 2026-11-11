@@ -16,17 +16,21 @@
 .status-title {
   font-size: 40rpx;
   font-weight: 700;
-  color: #C2405F;
+  color: #c2405f;
   line-height: 1.4;
 }
 .status-detail {
   margin-top: 8rpx;
   font-size: 26rpx;
-  color: #5C5C5C;
+  color: #5c5c5c;
   line-height: 1.6;
 }
-.status-period { background: #FFF0F3; }
-.status-alert .status-title { color: #A12D46; }
+.status-period {
+  background: #fff0f3;
+}
+.status-alert .status-title {
+  color: #a12d46;
+}
 
 /* ==================== 月份导航 ==================== */
 .month-nav {
@@ -43,11 +47,11 @@
   justify-content: center;
   background: #fff;
   border-radius: 50%;
-  box-shadow: 0 4rpx 16rpx rgba(255, 107, 138, 0.10);
+  box-shadow: 0 4rpx 16rpx rgba(255, 107, 138, 0.1);
 }
 .nav-arrow {
   font-size: 44rpx;
-  color: #FF6B8A;
+  color: #ff6b8a;
   font-weight: 300;
   margin-top: -4rpx;
 }
@@ -58,7 +62,7 @@
   padding: 12rpx 36rpx;
   border-radius: 40rpx;
   background: #fff;
-  box-shadow: 0 2rpx 12rpx rgba(0,0,0,0.04);
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.04);
 }
 
 /* ==================== 今天按钮 ==================== */
@@ -74,21 +78,21 @@
   padding: 14rpx 48rpx;
   background: #fff;
   border-radius: 32rpx;
-  border: 2rpx solid #FF6B8A;
-  box-shadow: 0 2rpx 12rpx rgba(255, 107, 138, 0.10);
+  border: 2rpx solid #ff6b8a;
+  box-shadow: 0 2rpx 12rpx rgba(255, 107, 138, 0.1);
 }
 .today-btn-text {
   font-size: 26rpx;
-  color: #C2405F;
+  color: #c2405f;
   font-weight: 600;
 }
 
 .pending-tip {
   text-align: center;
   font-size: 24rpx;
-  color: #A4415C;
+  color: #a4415c;
   margin-bottom: 12rpx;
-  background: #FFF0F3;
+  background: #fff0f3;
   padding: 12rpx 20rpx;
   border-radius: 12rpx;
 }
@@ -107,9 +111,11 @@
   flex: 1;
   text-align: center;
   font-size: 26rpx;
-  color: #6B6B6B;
+  color: #6b6b6b;
 }
-.text-weekend { color: #C2405F; }
+.text-weekend {
+  color: #c2405f;
+}
 
 /* ==================== 日历网格 ==================== */
 .calendar-grid {
@@ -118,7 +124,7 @@
   background: #fff;
   border-radius: 0 0 20rpx 20rpx;
   padding-bottom: 16rpx;
-  box-shadow: 0 4rpx 20rpx rgba(0,0,0,0.04);
+  box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.04);
 }
 
 .day-cell {
@@ -151,14 +157,20 @@
   border-radius: 16rpx;
   line-height: 1.6;
 }
-.start-tag { background: #C2405F; right: 4rpx; }
-.end-tag   { background: #C2405F; left: 4rpx; }
+.start-tag {
+  background: #c2405f;
+  right: 4rpx;
+}
+.end-tag {
+  background: #c2405f;
+  left: 4rpx;
+}
 
 .ovu-dot {
   width: 12rpx;
   height: 12rpx;
   border-radius: 50%;
-  background: #3D82D9;
+  background: #3d82d9;
   margin-top: 2rpx;
 }
 /* Fertile days that are not ovulation days get a bar, so the meaning does not rely on colour. */
@@ -166,26 +178,37 @@
   width: 24rpx;
   height: 6rpx;
   border-radius: 3rpx;
-  background: #2E7D4A;
+  background: #2e7d4a;
   margin-top: 4rpx;
 }
 
-.review-tag { font-size: 18rpx; color: #7A5C10; position: absolute; bottom: 2rpx; }
+.review-tag {
+  font-size: 18rpx;
+  color: #7a5c10;
+  position: absolute;
+  bottom: 2rpx;
+}
 
 /* ---- 非当月（可点击，会切换到那个月） ---- */
-.day-cell.dimmed .day-num { color: #949494; }
+.day-cell.dimmed .day-num {
+  color: #949494;
+}
 
 /* ---- 经期中间日 ---- */
-.day-cell.period-mid { background: #FFE0E6; }
-.day-cell.period-mid .day-num { color: #333; }
+.day-cell.period-mid {
+  background: #ffe0e6;
+}
+.day-cell.period-mid .day-num {
+  color: #333;
+}
 
 /* ---- 经期首/尾 ---- */
 .day-cell.period-start {
-  background: #FF9EAF;
+  background: #ff9eaf;
   border-radius: 16rpx 0 0 16rpx;
 }
 .day-cell.period-end {
-  background: #FF9EAF;
+  background: #ff9eaf;
   border-radius: 0 16rpx 16rpx 0;
 }
 .day-cell.period-start.period-end {
@@ -193,30 +216,36 @@
 }
 .day-cell.period-start .day-num,
 .day-cell.period-end .day-num {
-  color: #7A1F35;
+  color: #7a1f35;
   font-weight: 700;
 }
 
 /* ---- 预测与估计窗口 ---- */
-.day-cell.predicted { background: #FFF5F7; }
-.day-cell.predicted .day-num {
-  color: #C2405F;
-  border: 2rpx dashed #E8738A;
+.day-cell.predicted {
+  background: #fff5f7;
 }
-.day-cell.unreviewed { background: #FFF4CD; }
-.day-cell.fertile { background: #D3EFD9; }
+.day-cell.predicted .day-num {
+  color: #c2405f;
+  border: 2rpx dashed #e8738a;
+}
+.day-cell.unreviewed {
+  background: #fff4cd;
+}
+.day-cell.fertile {
+  background: #d3efd9;
+}
 
 /* ---- 今天，然后是待定开始日：同一天时待定开始日更醒目 ---- */
 .day-cell.today .day-num {
-  color: #2F6FC4;
+  color: #2f6fc4;
   font-weight: 700;
-  border: 3rpx solid #2F6FC4;
+  border: 3rpx solid #2f6fc4;
 }
 .day-cell.pending .day-num {
-  color: #C2405F;
+  color: #c2405f;
   font-weight: 700;
-  background: #FFF0F3;
-  border: 3rpx solid #C2405F;
+  background: #fff0f3;
+  border: 3rpx solid #c2405f;
 }
 
 /* ==================== 卡片 ==================== */
@@ -225,7 +254,7 @@
   background: #fff;
   border-radius: 20rpx;
   padding: 24rpx;
-  box-shadow: 0 2rpx 16rpx rgba(0,0,0,0.04);
+  box-shadow: 0 2rpx 16rpx rgba(0, 0, 0, 0.04);
 }
 
 .card-header {
@@ -244,7 +273,7 @@
 }
 .card-arrow {
   font-size: 22rpx;
-  color: #8C8C8C;
+  color: #8c8c8c;
 }
 
 /* ==================== 图例 ==================== */
@@ -259,7 +288,7 @@
   margin-right: 36rpx;
   margin-bottom: 14rpx;
   font-size: 24rpx;
-  color: #5C5C5C;
+  color: #5c5c5c;
 }
 .legend-swatch {
   width: 30rpx;
@@ -267,14 +296,35 @@
   border-radius: 8rpx;
   margin-right: 10rpx;
 }
-.swatch-period    { background: #FF9EAF; }
-.swatch-ovulation { background: #fff; border: 2rpx solid #C9DBF3; }
-.swatch-predicted { background: #FFF5F7; border: 2rpx dashed #E8738A; }
-.swatch-review    { background: #FFF4CD; }
-.swatch-fertile   { background: #D3EFD9; }
+.swatch-period {
+  background: #ff9eaf;
+}
+.swatch-ovulation {
+  background: #fff;
+  border: 2rpx solid #c9dbf3;
+}
+.swatch-predicted {
+  background: #fff5f7;
+  border: 2rpx dashed #e8738a;
+}
+.swatch-review {
+  background: #fff4cd;
+}
+.swatch-fertile {
+  background: #d3efd9;
+}
 /* The legend shows the same dot and bar as the calendar. */
-.swatch-ovulation, .swatch-fertile { display: flex; align-items: center; justify-content: center; box-sizing: border-box; }
-.legend-swatch .ovu-dot, .legend-swatch .fertile-bar { margin-top: 0; }
+.swatch-ovulation,
+.swatch-fertile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+.legend-swatch .ovu-dot,
+.legend-swatch .fertile-bar {
+  margin-top: 0;
+}
 
 /* ==================== 统计面板 ==================== */
 .stats-grid {
@@ -293,7 +343,7 @@
   word-break: break-all;
 }
 .stat-value.highlight {
-  color: #C2405F;
+  color: #c2405f;
 }
 .stat-unit {
   font-size: 22rpx;
@@ -305,7 +355,12 @@
   color: #707070;
   margin-top: 6rpx;
 }
-.model-note { margin-top: 12rpx; font-size: 22rpx; color: #707070; line-height: 1.6; }
+.model-note {
+  margin-top: 12rpx;
+  font-size: 22rpx;
+  color: #707070;
+  line-height: 1.6;
+}
 
 /* ==================== 外推候选经期 ==================== */
 .upcoming-section {
@@ -337,7 +392,7 @@
   width: 12rpx;
   height: 12rpx;
   border-radius: 50%;
-  background: #FF6B8A;
+  background: #ff6b8a;
   flex-shrink: 0;
 }
 .upcoming-date {
@@ -346,10 +401,26 @@
 }
 
 /* ==================== 记录列表 ==================== */
-.record-row { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; padding: 24rpx 0; border-bottom: 1rpx solid #F5F5F5; }
-.record-date { font-size: 25rpx; color: #333; }
-.record-status { font-size: 22rpx; color: #A4415C; flex-shrink: 0; }
-.review-status { color: #7A5C10; }
+.record-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid #f5f5f5;
+}
+.record-date {
+  font-size: 25rpx;
+  color: #333;
+}
+.record-status {
+  font-size: 22rpx;
+  color: #a4415c;
+  flex-shrink: 0;
+}
+.review-status {
+  color: #7a5c10;
+}
 
 /* ==================== 设置 ==================== */
 .settings-row {
@@ -377,8 +448,8 @@
 .picker-value {
   padding: 12rpx 24rpx;
   border-radius: 12rpx;
-  background: #FFF0F3;
-  color: #A4415C;
+  background: #fff0f3;
+  color: #a4415c;
   font-size: 26rpx;
   font-weight: 600;
 }
@@ -395,7 +466,9 @@
   border: none !important;
   line-height: 1 !important;
 }
-.reset-btn::after { border: none; }
+.reset-btn::after {
+  border: none;
+}
 .footer-text {
   font-size: 22rpx;
   color: #707070;
@@ -418,8 +491,12 @@
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .setup-modal {
@@ -432,8 +509,14 @@
 }
 
 @keyframes slideUp {
-  from { transform: translateY(40rpx); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+  from {
+    transform: translateY(40rpx);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .setup-header {
@@ -498,7 +581,7 @@
   font-weight: 600;
 }
 .setup-btn-primary {
-  background: linear-gradient(135deg, #FF6B8A, #FF8FA3);
+  background: linear-gradient(135deg, #ff6b8a, #ff8fa3);
   color: #fff;
   box-shadow: 0 6rpx 20rpx rgba(255, 107, 138, 0.25);
 }
@@ -510,16 +593,77 @@
 }
 
 /* ==================== 编辑与提示 ==================== */
-.notice-card { margin: 20rpx 0; padding: 24rpx; border-radius: 16rpx; background: #FFF9E6; color: #6E5410; font-size: 24rpx; line-height: 1.6; }
-.error-card { margin-top: 32rpx; background: #FFF0F3; color: #A12D46; }
-.error-hint { margin-top: 12rpx; }
-.editor-modal { max-height: 85vh; overflow-y: auto; }
-.editor-row { display: flex; justify-content: space-between; align-items: center; gap: 20rpx; padding: 24rpx 0; border-bottom: 1rpx solid #F2F2F2; font-size: 26rpx; }
-.date-input { padding: 12rpx 20rpx; border-radius: 12rpx; background: #FFF0F3; color: #B14461; }
-.gap-label { display: flex; flex-direction: column; flex: 1; }
-.editor-actions, .draft-actions { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 24rpx; }
-.primary-action, .secondary-action, .delete-action, .small-action { font-size: 24rpx; margin: 12rpx 0 0; border-radius: 12rpx; }
-.primary-action { background: #C2405F; color: #FFF; }
-.secondary-action, .small-action { background: #FFF0F3; color: #A4415C; }
-.delete-action { background: #FFF; color: #A12D46; }
-.small-action { margin: 0; padding: 0 20rpx; font-size: 22rpx; }
+.notice-card {
+  margin: 20rpx 0;
+  padding: 24rpx;
+  border-radius: 16rpx;
+  background: #fff9e6;
+  color: #6e5410;
+  font-size: 24rpx;
+  line-height: 1.6;
+}
+.error-card {
+  margin-top: 32rpx;
+  background: #fff0f3;
+  color: #a12d46;
+}
+.error-hint {
+  margin-top: 12rpx;
+}
+.editor-modal {
+  max-height: 85vh;
+  overflow-y: auto;
+}
+.editor-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20rpx;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid #f2f2f2;
+  font-size: 26rpx;
+}
+.date-input {
+  padding: 12rpx 20rpx;
+  border-radius: 12rpx;
+  background: #fff0f3;
+  color: #b14461;
+}
+.gap-label {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+.editor-actions,
+.draft-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 24rpx;
+}
+.primary-action,
+.secondary-action,
+.delete-action,
+.small-action {
+  font-size: 24rpx;
+  margin: 12rpx 0 0;
+  border-radius: 12rpx;
+}
+.primary-action {
+  background: #c2405f;
+  color: #fff;
+}
+.secondary-action,
+.small-action {
+  background: #fff0f3;
+  color: #a4415c;
+}
+.delete-action {
+  background: #fff;
+  color: #a12d46;
+}
+.small-action {
+  margin: 0;
+  padding: 0 20rpx;
+  font-size: 22rpx;
+}

@@ -18,7 +18,10 @@ test('a single damaged record can be set aside while the other records keep work
   e.p.repairData();
   assert.equal(e.p.data.loadError, '');
   assert.equal(e.p.data.repairText, '');
-  assert.deepEqual(e.p._state.periods.map(p => p.start), ['2026-08-01', '2026-08-29']);
+  assert.deepEqual(
+    e.p._state.periods.map(p => p.start),
+    ['2026-08-01', '2026-08-29'],
+  );
   assert.deepEqual(wx.values.get(S.REPAIR_BACKUP), raw);
   assert.equal(e.p.data.periodCount, 2);
   assert.match(e.p.data.migrationMessage, /已隔离 1 条/);
@@ -26,7 +29,11 @@ test('a single damaged record can be set aside while the other records keep work
 });
 
 test('settings and drafts that fail validation fall back to defaults during repair', () => {
-  const raw = stateWith([record('2026-09-01')], { predictionMode: 'manual', manualCycleLength: 5, manualPeriodLength: 3 });
+  const raw = stateWith([record('2026-09-01')], {
+    predictionMode: 'manual',
+    manualCycleLength: 5,
+    manualPeriodLength: 3,
+  });
   raw.draft = { start: 'not-a-date', end: null };
   const plan = S.planRepair(raw, '2026-10-03');
   assert.deepEqual([plan.removedCount, plan.resetPreferences, plan.droppedDraft], [0, true, true]);
@@ -38,7 +45,10 @@ test('settings and drafts that fail validation fall back to defaults during repa
 
 test('ambiguous damage and newer schema versions are never repaired automatically', () => {
   const overlap = stateWith([record('2026-09-01'), record('2026-09-03')]);
-  const twoOngoing = stateWith([record('2026-08-01', 1, { end: null, status: 'ongoing' }), record('2026-09-01', 1, { end: null, status: 'ongoing' })]);
+  const twoOngoing = stateWith([
+    record('2026-08-01', 1, { end: null, status: 'ongoing' }),
+    record('2026-09-01', 1, { end: null, status: 'ongoing' }),
+  ]);
   const newer = { ...stateWith(), schemaVersion: 3 };
   for (const raw of [overlap, twoOngoing, newer]) {
     assert.equal(S.planRepair(raw, '2026-10-03'), null);
