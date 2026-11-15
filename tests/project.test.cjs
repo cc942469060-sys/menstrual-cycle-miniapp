@@ -13,6 +13,11 @@ test('CI installs the locked tools, runs the regression tests, and checks format
   assert.match(workflow, /run: npm ci/);
   assert.match(workflow, /run: npm test/);
   assert.match(workflow, /run: npm run format:check/);
+  assert.match(workflow, /^permissions:\r?\n {2}contents: read\r?$/m, 'the token can only read the repository');
+  const actions = [...workflow.matchAll(/uses: (\S+)/g)].map(match => match[1]);
+  assert(actions.length >= 2, 'the workflow uses actions');
+  for (const action of actions)
+    assert.match(action, /^[\w.-]+\/[\w.-]+@[0-9a-f]{40}$/, `${action} is pinned to a commit`);
   const pkg = JSON.parse(read('package.json'));
   assert.equal(pkg.scripts['format:check'], 'prettier --check .');
   assert.match(pkg.devDependencies.prettier, /^\d+\.\d+\.\d+$/, 'the formatter version is pinned');
