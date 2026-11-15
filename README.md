@@ -85,6 +85,6 @@ Prettier 不支持 WXML，WXML 保持手写格式；README 等 Markdown 和由�
 
 仓库根目录的 `.gitattributes`（`* text=auto eol=lf`）让每次检出都使用 LF 换行，所以在 Windows（`core.autocrlf=true`）上 `npm run format:check` 也能通过。Windows 上在加入它之前检出的旧工作区还是 CRLF，要刷新一次：先确认 `git status --porcelain --untracked-files=no` 没有输出（有未提交的改动时不要继续，`git reset --hard` 会丢掉它们），再依次运行 `git rm --cached -r -q .` 和 `git reset --hard -q`；未跟踪和被忽略的文件不受影响。
 
-GitHub Actions（`.github/workflows/test.yml`）会在每个 PR 和推送到 `main` 时用 Node 24 先 `npm ci`，再运行 `npm test` 和 `npm run format:check`。
+GitHub Actions（`.github/workflows/test.yml`）会在每个 PR 和推送到 `main` 时用 Node 24 先 `npm ci`，再运行 `npm test` 和 `npm run format:check`。工作流只授予读取仓库内容的权限（`permissions: contents: read`），引用的 Actions 固定到具体提交 SHA；升级时要同时更新 SHA 和后面的版本注释。
 
 微信打包配置排除测试目录、`.github`、`node_modules`、npm 和 Prettier 的配置文件、`.gitattributes`、计划文档目录 `plans/` 以及 README。开发者工具/真机仍需验证选择器、弹窗、视图样式和本地存储的原生交互，以及文件转发、选择聊天文件、剪贴板和隐私授权弹窗的实际表现。
