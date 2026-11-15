@@ -22,7 +22,8 @@ test('CI installs the locked tools, runs the regression tests, and checks format
 test('project-only files stay out of the mini program package', () => {
   const ignored = JSON.parse(read('project.config.json')).packOptions.ignore.map(item => item.value);
   const projectOnly = ['tests', '.github', 'node_modules', 'package.json', 'package-lock.json', 'README.md'];
-  for (const value of [...projectOnly, '.prettierrc.json', '.prettierignore']) assert(ignored.includes(value), value);
+  for (const value of [...projectOnly, '.prettierrc.json', '.prettierignore', '.gitattributes', 'plans'])
+    assert(ignored.includes(value), value);
 });
 
 // A toast without an icon shows at most two lines; 20 characters is a conservative limit.
@@ -33,4 +34,9 @@ test('fixed toast and error messages fit in two lines', () => {
   );
   assert(messages.length > 30, `found ${messages.length} messages`);
   for (const message of messages) assert(message.length <= 20, message);
+});
+
+test('every checkout uses LF line endings, matching the formatter', () => {
+  assert.match(read('.gitattributes'), /^\* text=auto eol=lf\r?$/m);
+  assert.equal(JSON.parse(read('.prettierrc.json')).endOfLine, 'lf');
 });

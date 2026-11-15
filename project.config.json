@@ -9,6 +9,8 @@
       { "type": "file", "value": "package-lock.json" },
       { "type": "file", "value": ".prettierrc.json" },
       { "type": "file", "value": ".prettierignore" },
+      { "type": "file", "value": ".gitattributes" },
+      { "type": "folder", "value": "plans" },
       { "type": "file", "value": "README.md" }
     ],
     "include": []

@@ -1,0 +1,2 @@
+# Every checkout uses LF so Prettier's check (endOfLine: lf) passes on Windows too.
+* text=auto eol=lf
