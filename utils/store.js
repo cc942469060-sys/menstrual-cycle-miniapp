@@ -155,11 +155,13 @@ function migrateLegacy(raw, today) {
     } else warnings.push('旧预测参数不适用，已恢复自动模式；原设置已备份。');
   }
   if (raw.pendingStart != null && raw.pendingStart !== '') {
-    if (!C.isDate(raw.pendingStart) || raw.pendingStart > today) throw new Error('旧草稿日期异常，原数据已保留');
+    if (!C.isDate(raw.pendingStart)) throw new Error('旧草稿日期异常，原数据已保留');
+    // Like stored drafts, a start after today (clock change or travel) is kept for the user to check.
+    if (raw.pendingStart > today) warnings.push('旧版未完成的录入晚于今天，请核对设备日期。');
     state.draft = { start: raw.pendingStart, end: null };
   }
   if (state.periods.length) warnings.push('旧记录已备份。请逐条核对开始和结束日期，确认后才参与统计与预测。');
-  return { state: validateState(state, today), warnings };
+  return { state: validateState(state, today, true), warnings };
 }
 
 function isMissing(raw) {
