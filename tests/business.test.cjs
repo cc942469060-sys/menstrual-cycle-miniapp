@@ -538,6 +538,26 @@ test('migration ignores derived legacy means and safely replaces invalid predict
   assert.equal(r.state.preferences.initialPeriodLength, 5);
   assert(r.warnings.length > 0);
 });
+test('a legacy draft dated after today is kept for review instead of blocking the upgrade', () => {
+  const raw = { markedDates: ['2026-09-01'], pendingStart: '2026-10-05' };
+  const r = S.migrateLegacy(raw, '2026-10-03');
+  assert.deepEqual(r.state.draft, { start: '2026-10-05', end: null });
+  assert(r.warnings.includes('旧版未完成的录入晚于今天，请核对设备日期。'));
+  const wx = storage(raw);
+  assert.equal(S.load(wx, '2026-10-03').ok, true);
+  assert.deepEqual(wx.values.get(S.LEGACY_BACKUP), raw);
+  assert.deepEqual(wx.values.get(S.KEY).draft, { start: '2026-10-05', end: null });
+  const e = page(raw);
+  assert.equal(e.p.data.loadError, '');
+  assert.equal(e.p.data.pendingStart, '2026-10-05');
+});
+test('a legacy draft with an impossible date still stops the upgrade', () => {
+  const raw = { markedDates: ['2026-09-01'], pendingStart: '2026-02-30' };
+  assert.throws(() => S.migrateLegacy(raw, '2026-10-03'));
+  const wx = storage(raw);
+  assert.equal(S.load(wx, '2026-10-03').ok, false);
+  assert.deepEqual(wx.values.get(S.KEY), raw);
+});
 test('confirming a legacy record supplies actual dates before statistical inclusion', () => {
   const e = page({ markedDates: ['2026-09-01', '2026-09-02', '2026-09-03', '2026-09-04', '2026-09-05'] });
   assert.equal(e.p.data.periodCount, 0);
