@@ -271,3 +271,69 @@ test('calendar days carry screen-reader text, and fertile days a mark that is no
       wxml.includes('swatch-ovulation"><view class="ovu-dot"></view>'),
   );
 });
+
+// ---- Template bindings ----
+
+// The page sends only fields that changed, so a template binding to a field the view never provides
+// renders blank instead of failing. This keeps pages/index/index.wxml and utils/view.js in step.
+test('every template binding is a field the page provides', () => {
+  const wxml = fs.readFileSync(path.join(root, 'pages/index/index.wxml'), 'utf8');
+  const e = page(stateWith(['2026-06-10', '2026-07-08', '2026-08-05', '2026-09-02'].map(start => record(start))), {
+    today: '2026-09-10T12:00:00',
+  });
+
+  // Top-level names inside {{ }}: drop quoted text, then keep identifiers that do not follow a dot.
+  const keywords = new Set(['item', 'index', 'true', 'false', 'null', 'undefined']);
+  const names = new Set();
+  for (const [, expression] of wxml.matchAll(/\{\{([^}]*)\}\}/g)) {
+    for (const [, name] of expression.replace(/'[^']*'/g, '').matchAll(/(?<![.\w])([A-Za-z_]\w*)/g)) {
+      if (!keywords.has(name)) names.add(name);
+    }
+  }
+  assert(names.size > 40, `found ${names.size} bindings`);
+  assert.deepEqual(
+    [...names].filter(name => !(name in e.p.data)),
+    [],
+    'bindings without a page field',
+  );
+  // A field renamed in utils/view.js would still find its old default in the page data and render blank,
+  // so every field the page sets must also be declared in the page's initial data.
+  const declared = Object.keys(e.def.data);
+  const sent = new Set(e.calls.flatMap(call => Object.keys(call).map(key => key.replace(/\[\d+\]$/, ''))));
+  assert.deepEqual(
+    [...sent].filter(key => !declared.includes(key)),
+    [],
+    'fields set without a default in the page data',
+  );
+
+  // Loops are not nested, so each loop's item fields sit between its wx:for and the next one.
+  const cell = {
+    date: '2026-09-10',
+    day: 10,
+    isCurrentMonth: true,
+    isToday: true,
+    isMarked: true,
+    isPeriodStart: true,
+    isPeriodEnd: true,
+    isPending: true,
+    isPredicted: true,
+    isUnreviewed: true,
+    isFertile: true,
+  };
+  const items = {
+    weekdays: V.weekdays(0),
+    calendarGrid: [V.viewCell({ ...cell, isOvulation: false }), V.viewCell({ ...cell, isOvulation: true })],
+    upcomingPeriods: e.p.data.upcomingPeriods,
+    periodRows: e.p.data.periodRows,
+  };
+  const loops = [...wxml.matchAll(/wx:for="\{\{(\w+)\}\}"/g)];
+  assert.deepEqual(loops.map(loop => loop[1]).sort(), Object.keys(items).sort(), 'every loop has item fixtures');
+  loops.forEach((loop, i) => {
+    const span = wxml.slice(loop.index, i + 1 < loops.length ? loops[i + 1].index : wxml.length);
+    const provided = new Set(items[loop[1]].flatMap(item => Object.keys(item)));
+    assert(provided.size > 0, `${loop[1]} fixture is empty`);
+    for (const [, field] of span.matchAll(/item\.(\w+)/g)) {
+      assert(provided.has(field), `${loop[1]} items have no ${field}`);
+    }
+  });
+});
