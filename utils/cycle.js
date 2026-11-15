@@ -311,12 +311,17 @@ function computePredictions(state, today) {
   const due = result.nextPeriodStart || result.expectedWindowEnd;
   result.overdueDays = Math.max(0, daysBetween(due, today));
   result.predictionStatus = due < today ? 'overdue' : due === today ? 'due' : 'upcoming';
-  result.predictionStatusText =
-    result.predictionStatus === 'overdue'
-      ? `预计日期已过 ${result.overdueDays} 天，尚未确认`
-      : result.predictionStatus === 'due'
-        ? '预计今天开始，尚未确认'
-        : '预计日期尚未到';
+  // Without an exact date, "due" is only the last day of the possible range, not a predicted start.
+  const byRange = !result.nextPeriodStart;
+  if (result.predictionStatus === 'overdue') {
+    result.predictionStatusText = byRange
+      ? `已超出可能范围 ${result.overdueDays} 天，尚未确认`
+      : `预计日期已过 ${result.overdueDays} 天，尚未确认`;
+  } else if (result.predictionStatus === 'due') {
+    result.predictionStatusText = byRange ? '今天是可能范围的最后一天，尚未确认' : '预计今天开始，尚未确认';
+  } else {
+    result.predictionStatusText = '预计日期尚未到';
+  }
   if (!result.nextPeriodStart) return result;
   const endLimit = addDays(today, 365);
   const predicted = new Set();

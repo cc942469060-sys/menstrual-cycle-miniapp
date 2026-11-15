@@ -126,6 +126,38 @@ test('the status card tells the user where they are in the cycle', () => {
   assert.equal(status(stateWith([record('2026-08-01', 30)]), '2026-10-03').title, '暂不提供日期预测');
 });
 
+test('an irregular cycle is described by its possible range, not as a predicted start', () => {
+  const irregular = stateWith(starts('2026-04-01', [18, 45, 18, 45]).map(start => record(start)));
+  const at = today => {
+    const model = C.computePredictions(irregular, today);
+    return [model.predictionStatus, model.predictionStatusText, V.describeStatus(model, today)];
+  };
+  assert.deepEqual(at('2026-09-19'), [
+    'due',
+    '今天是可能范围的最后一天，尚未确认',
+    {
+      tone: 'alert',
+      title: '今天是可能范围的最后一天',
+      detail: '记录间隔波动较大，可能范围 2026-08-23 ~ 2026-09-19；如果已经开始，点日历上的今天记录。',
+    },
+  ]);
+  assert.deepEqual(at('2026-09-20'), [
+    'overdue',
+    '已超出可能范围 1 天，尚未确认',
+    {
+      tone: 'alert',
+      title: '已超出可能范围 1 天',
+      detail: '可能范围 2026-08-23 ~ 2026-09-19，还没有记录开始；如果已经开始，请补录。',
+    },
+  ]);
+  // Cycles with an exact date keep their wording.
+  const regular = stateWith(['2026-06-10', '2026-07-08', '2026-08-05', '2026-09-02'].map(start => record(start)));
+  assert.equal(
+    V.describeStatus(C.computePredictions(regular, '2026-10-03'), '2026-10-03').detail,
+    '预计 2026-09-30，还没有记录开始；如果已经开始，请补录。',
+  );
+});
+
 // ---- Calendar taps ----
 
 test('tapping the chosen start again asks before recording a one-day period', () => {
