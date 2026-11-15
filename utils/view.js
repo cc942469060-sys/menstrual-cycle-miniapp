@@ -102,12 +102,26 @@ function describeStatus(model, today) {
           : `从 ${model.ongoingStart} 开始，结束后点日历上的结束日即可。`,
       };
     case 'due':
+      if (!model.nextPeriodStart) {
+        return {
+          tone: 'alert',
+          title: '今天是可能范围的最后一天',
+          detail: `记录间隔波动较大，可能范围 ${range}；如果已经开始，点日历上的今天记录。`,
+        };
+      }
       return { tone: 'alert', title: '预计今天开始', detail: `如果已经开始，点日历上的今天记录${rough}。` };
     case 'overdue':
+      if (!model.nextPeriodStart) {
+        return {
+          tone: 'alert',
+          title: `已超出可能范围 ${model.overdueDays} 天`,
+          detail: `可能范围 ${range}，还没有记录开始；如果已经开始，请补录。`,
+        };
+      }
       return {
         tone: 'alert',
         title: `比预计晚了 ${model.overdueDays} 天`,
-        detail: `预计 ${model.nextPeriodStart || model.expectedWindowEnd}，还没有记录开始；如果已经开始，请补录。`,
+        detail: `预计 ${model.nextPeriodStart}，还没有记录开始；如果已经开始，请补录。`,
       };
     case 'upcoming':
       if (model.nextPeriodStart)
